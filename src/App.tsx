@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SeriesEngine, type AudioMode } from "./series/engine";
 import { EPISODES } from "./series";
 import type { EpisodeDef } from "./series/types";
+import { SUBTITLES } from "./series/subtitles";
 
 const fmt = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
 const fmtMs = (t: number) => `${fmt(t)}.${String(Math.floor((t % 1) * 10))}`;
@@ -58,8 +59,10 @@ export default function App() {
   const [note, setNote] = useState("");
   const [binge, setBinge] = useState(true);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [showSubs, setShowSubs] = useState(true);
 
   const ep = EPISODES[epIdx];
+  const currentSub = showSubs ? SUBTITLES[ep.id]?.find((s) => time >= s.start && time <= s.end)?.text : null;
 
   useEffect(() => {
     const e = new SeriesEngine(canvasRef.current!, EPISODES[0]);
@@ -165,6 +168,7 @@ export default function App() {
       } else if (e.code === "ArrowRight") eng().seek(eng().t + 5);
       else if (e.code === "ArrowLeft") eng().seek(eng().t - 5);
       else if (e.key === "f") playerRef.current?.requestFullscreen?.();
+      else if (e.key === "c" || e.key === "C") setShowSubs((s) => !s);
       else if (e.key === "m") {
         setMuted((m) => {
           eng().setMuted(!m);
@@ -279,6 +283,16 @@ export default function App() {
               <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" /> REC {fmt(time)}
             </div>
           )}
+          {started && !ended && currentSub && (
+            <div className="pointer-events-none absolute bottom-8 left-0 right-0 z-20 flex justify-center px-6 text-center transition-all duration-300">
+              <span
+                className="inline-block max-w-2xl rounded-lg bg-black/85 px-4 py-2 text-sm md:text-base font-light tracking-wide text-amber-100 backdrop-blur-md shadow-2xl ring-1 ring-white/15"
+                style={{ fontFamily: SERIF, textShadow: "0 2px 6px rgba(0,0,0,0.9)" }}
+              >
+                {currentSub}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* ------------------------------------------------------ controls */}
@@ -314,11 +328,12 @@ export default function App() {
               {activeVo && <span className="ml-3 rounded bg-amber-300/15 px-2 py-0.5 text-[10px] tracking-widest text-amber-200">VO WINDOW</span>}
             </div>
             <div className="flex items-center gap-1">
+              <button onClick={() => setShowSubs(!showSubs)} className={`rounded px-2 py-1 text-[10px] tracking-widest transition ${showSubs ? "bg-amber-400/20 text-amber-200 ring-1 ring-amber-400/30" : "text-slate-400 hover:text-white"}`}>{showSubs ? "CC ON" : "CC OFF"}</button>
               <button onClick={() => { eng().setMuted(!muted); setMuted(!muted); }} className="rounded px-2 py-1 text-[10px] tracking-widest text-slate-400 hover:text-white">{muted ? "UNMUTE" : "MUTE"}</button>
               <button onClick={() => playerRef.current?.requestFullscreen?.()} className="rounded px-2 py-1 text-[10px] tracking-widest text-slate-400 hover:text-white">FULLSCREEN</button>
             </div>
           </div>
-          <p className="mt-1 text-[10px] tracking-wider text-slate-600">SPACE play/pause · ← → ±5s · 1–4 episode · F fullscreen · M mute</p>
+          <p className="mt-1 text-[10px] tracking-wider text-slate-600">SPACE play/pause · ← → ±5s · 1–4 episode · F fullscreen · M mute · C subtitles</p>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2.5">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-[10px] tracking-widest text-slate-400">AUDIO TRACK:</span>
@@ -409,7 +424,7 @@ export default function App() {
         )}
 
         {tab === "export" && (
-          <section className="mt-5 grid gap-4 sm:grid-cols-3">
+          <section className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-xl bg-white/[0.03] p-4 ring-1 ring-white/5">
               <h3 className="text-sm text-white">Record episode {ep.roman}</h3>
               <p className="mt-1 text-xs leading-relaxed text-slate-400">Captures the canvas and score in real time to a video file. Keep the tab in front for {fmt(D)}.</p>
@@ -428,6 +443,14 @@ export default function App() {
               <h3 className="text-sm text-white">Cue sheet</h3>
               <p className="mt-1 text-xs leading-relaxed text-slate-400">Chapters, homages and narration windows as Markdown.</p>
               <button onClick={() => download(new Blob([cueSheet(ep)], { type: "text/markdown" }), `star-catcher-ep${ep.roman}-cues.md`)} className="mt-3 rounded-full border border-white/30 px-4 py-2 text-[11px] tracking-widest hover:bg-white/10">DOWNLOAD .MD</button>
+            </div>
+            <div className="rounded-xl bg-white/[0.03] p-4 ring-1 ring-white/5">
+              <h3 className="text-sm text-white">Subtitles</h3>
+              <p className="mt-1 text-xs leading-relaxed text-slate-400">Time-locked subtitles for Ep. {ep.roman} in VTT and SRT format.</p>
+              <div className="mt-3 flex gap-2">
+                <a href={`/subtitles/${ep.id}.vtt`} download={`star-catcher-ep${ep.roman}.vtt`} className="rounded-full border border-white/30 px-3 py-2 text-[10px] tracking-widest hover:bg-white/10">.VTT</a>
+                <a href={`/subtitles/${ep.id}.srt`} download={`star-catcher-ep${ep.roman}.srt`} className="rounded-full border border-white/30 px-3 py-2 text-[10px] tracking-widest hover:bg-white/10">.SRT</a>
+              </div>
             </div>
             {note && <p className="text-xs text-slate-400 sm:col-span-3">{note}</p>}
           </section>

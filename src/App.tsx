@@ -189,10 +189,29 @@ export default function App() {
     setStarted(true);
     setEnded(false);
     setRecording(true);
-    setNote("Recording in real time. Keep this tab in the foreground until the episode ends.");
-    await eng().record((blob, ext) => {
+    setNote(`Recording Episode ${ep.roman} in real time with Suno music & narration. Keep this tab in the foreground.`);
+    await eng().record(async (blob, ext) => {
+      setNote(`Encoding pristine MP4 with FFmpeg (H.264 / AAC / Suno Audio)...`);
+      try {
+        const res = await fetch(`/api/export-mp4?episode=${ep.roman}`, {
+          method: "POST",
+          body: blob,
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setRecording(false);
+          setNote(`Saved ${data.filename} directly to your Downloads folder!`);
+          const a = document.createElement("a");
+          a.href = `/api/download-mp4?episode=${ep.roman}&t=${Date.now()}`;
+          a.download = data.filename;
+          a.click();
+          return;
+        }
+      } catch (err) {
+        console.warn("Direct MP4 export fallback:", err);
+      }
       setRecording(false);
-      setNote(`Saved star-catcher-ep${ep.roman}.${ext} (${(blob.size / 1e6).toFixed(1)} MB). Score is baked in.`);
+      setNote(`Saved star-catcher-ep${ep.roman}.${ext} (${(blob.size / 1e6).toFixed(1)} MB).`);
       download(blob, `star-catcher-ep${ep.roman}.${ext}`);
     });
   };
@@ -426,12 +445,12 @@ export default function App() {
         {tab === "export" && (
           <section className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-xl bg-white/[0.03] p-4 ring-1 ring-white/5">
-              <h3 className="text-sm text-white">Record episode {ep.roman}</h3>
-              <p className="mt-1 text-xs leading-relaxed text-slate-400">Captures the canvas and score in real time to a video file. Keep the tab in front for {fmt(D)}.</p>
+              <h3 className="text-sm text-white">Record Episode {ep.roman} (MP4)</h3>
+              <p className="mt-1 text-xs leading-relaxed text-slate-400">Captures canvas, Suno music score, and narration in real time. Automatically encodes as an MP4 (H.264 / AAC) with FFmpeg.</p>
               {recording ? (
                 <button onClick={stopRecord} className="mt-3 rounded-full border border-red-400/50 px-4 py-2 text-[11px] tracking-widest text-red-300">STOP</button>
               ) : (
-                <button onClick={record} className="mt-3 rounded-full border border-white/30 px-4 py-2 text-[11px] tracking-widest hover:bg-white/10">● RECORD</button>
+                <button onClick={record} className="mt-3 rounded-full border border-white/30 px-4 py-2 text-[11px] tracking-widest hover:bg-white/10">● RECORD MP4</button>
               )}
             </div>
             <div className="rounded-xl bg-white/[0.03] p-4 ring-1 ring-white/5">

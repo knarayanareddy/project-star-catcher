@@ -10,6 +10,7 @@ export class StreamScorer implements Scorer {
 
   constructor(private ctx: AudioContext, private outs: AudioNode[], src: string) {
     this.audio = new Audio(src);
+    this.audio.crossOrigin = "anonymous";
     this.audio.preload = "auto";
     try {
       this.source = this.ctx.createMediaElementSource(this.audio);
@@ -235,7 +236,14 @@ export class SeriesEngine {
     this.pause();
     const vs = (this.out as any).captureStream(30) as MediaStream;
     const stream = new MediaStream([...vs.getVideoTracks(), ...this.recDest!.stream.getAudioTracks()]);
-    const types = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"];
+    const types = [
+      "video/mp4;codecs=avc1,mp4a.40.2",
+      "video/mp4;codecs=avc1",
+      "video/mp4",
+      "video/webm;codecs=vp9,opus",
+      "video/webm;codecs=vp8,opus",
+      "video/webm",
+    ];
     const mime = types.find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m)) ?? "";
     this.chunks = [];
     const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 14_000_000, audioBitsPerSecond: 256_000 } : undefined);

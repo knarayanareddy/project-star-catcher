@@ -1,35 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Engine } from "./film/engine";
-import { CHAPTERS, SERIES, chapterAt } from "./film/timeline";
-import { DURATION } from "./film/util";
+import { SeriesEngine, type AudioMode } from "./series/engine";
+import { EPISODES } from "./series";
+import type { EpisodeDef } from "./series/types";
 
 const fmt = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
 const fmtMs = (t: number) => `${fmt(t)}.${String(Math.floor((t % 1) * 10))}`;
+const SERIF = '"Cormorant Garamond", Georgia, serif';
 
-type Tab = "chapters" | "narration" | "series" | "export";
-
-function cueSheet() {
-  const lines: string[] = [];
-  lines.push("# STAR CATCHER — Episode I: The Hollow Tide");
-  lines.push("Runtime 5:00 · 16:9 · generated in-browser · heartbeat motif spine\n");
-  lines.push("## Chapters & narration windows\n");
-  for (const c of CHAPTERS) {
-    lines.push(`### ${c.n}. ${c.title}  (${fmt(c.start)} – ${fmt(c.end)})`);
-    lines.push(`*Homage:* ${c.homage}\n`);
-    lines.push(c.logline + "\n");
-    for (const v of c.vo) lines.push(`- **VO ${fmtMs(v.at)} → ${fmtMs(v.at + v.dur)}** (${v.dur}s): ${v.note}`);
-    lines.push("");
-  }
-  lines.push("## Series bible\n");
-  for (const e of SERIES) lines.push(`- **Episode ${e.n} — ${e.title}** [${e.status}]: ${e.pitch}`);
-  lines.push("\n## Motifs to carry forward\n");
-  lines.push("- The **heartbeat** (mech heart → baby's heart → the empty mech's final beat at 4:55).");
-  lines.push("- The **lullaby** (D-minor music box; major when given, warped when wrong).");
-  lines.push("- The **belly map**: the Mother's constellation is a portrait of the Star Catcher. His chest star was missing until he gave it away.");
-  lines.push("- The **sea reflects the true sky**: watch the eyes.");
-  lines.push("- The **spinning top** never falls on screen.");
-  return lines.join("\n");
-}
+type Tab = "chapters" | "narration" | "bible" | "export";
 
 function download(blob: Blob, name: string) {
   const a = document.createElement("a");
@@ -39,24 +17,55 @@ function download(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
+function cueSheet(ep: EpisodeDef) {
+  const L: string[] = [];
+  L.push(`# STAR CATCHER — Episode ${ep.roman}: ${ep.title}`);
+  L.push(`Runtime ${fmt(ep.duration)} · 16:9 · generated in-browser\n`);
+  L.push(ep.pitch + "\n");
+  L.push("## Chapters & narration windows\n");
+  for (const c of ep.chapters) {
+    L.push(`### ${c.n}. ${c.title}  (${fmt(c.start)} – ${fmt(c.end)})`);
+    L.push(`*Homage:* ${c.homage}\n`);
+    L.push(c.logline + "\n");
+    for (const v of c.vo) L.push(`- **VO ${fmtMs(v.at)} → ${fmtMs(v.at + v.dur)}** (${v.dur}s): ${v.note}`);
+    L.push("");
+  }
+  return L.join("\n");
+}
+
+const MOTIFS = [
+  { k: "The heartbeat", v: ["Mech heart → baby's heart → the empty mech's last beat (I).", "Silence, then a far-off pulse from above the mirror, answered at 2:22 by a lantern heart (II).", "A second, smaller heart inside the belly map (III).", "Both hearts find the same beat at 2:30 (IV)."] },
+  { k: "The lullaby", v: ["D-minor music box; major when given, warped when wrong (I).", "Hummed by a lantern in an empty cockpit (II).", "Eight stars, eight bells: the child figure draws itself (III).", "Fully major, full choir, as the star comes home (IV)."] },
+  { k: "The belly map", v: ["The Mother's constellation is a portrait of the Star Catcher (I).", "A black rectangle appears in the reflected sky (II).", "A second figure, smaller, holding his hand (III).", "Three hearts, completed across the whole sky (IV)."] },
+  { k: "The sea reflects the true sky", v: ["Watch the eyes (I).", "The mirror gives the lanterns back as stars (II).", "The slab shows him something that isn't his reflection (III).", "The sky was never above. It was the other side of the water (IV)."] },
+  { k: "The spinning top", v: ["Never falls on screen (I).", "Spins by itself in an empty cockpit (II).", "Wobbles in the vision tunnel (III).", "Still spinning. We cut before we know (IV)."] },
+];
+
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
-  const engRef = useRef<Engine | null>(null);
+  const engRef = useRef<SeriesEngine | null>(null);
+  const lastUi = useRef(0);
+  const [epIdx, setEpIdx] = useState(0);
+  const [audioMode, setAudioMode] = useState<AudioMode>("suno-master");
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [started, setStarted] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [ended, setEnded] = useState(false);
   const [tab, setTab] = useState<Tab>("chapters");
   const [recording, setRecording] = useState(false);
-  const [ended, setEnded] = useState(false);
   const [note, setNote] = useState("");
-  const lastUi = useRef(0);
+  const [binge, setBinge] = useState(true);
+  const [countdown, setCountdown] = useState<number | null>(null);
+
+  const ep = EPISODES[epIdx];
 
   useEffect(() => {
-    const e = new Engine(canvasRef.current!);
+    const e = new SeriesEngine(canvasRef.current!, EPISODES[0]);
     engRef.current = e;
-    (window as any).__film = e;
+    (window as any).__eng = e;
+    (window as any).__eps = Object.fromEntries(EPISODES.map((x) => [x.id.toUpperCase(), x]));
     e.onTick = (t) => {
       const now = performance.now();
       if (now - lastUi.current > 90) {
@@ -67,27 +76,34 @@ export default function App() {
     e.onState = setPlaying;
     e.onEnd = () => {
       setEnded(true);
-      setTime(DURATION);
+      setTime(e.duration);
     };
-    e.seek(31.6, false);
-    setTime(0);
+    e.seek(EPISODES[0].posterAt, false);
     return () => e.destroy();
   }, []);
 
   const eng = () => engRef.current!;
 
+  const changeAudioMode = useCallback((mode: AudioMode) => {
+    setAudioMode(mode);
+    engRef.current?.setAudioMode(mode);
+  }, []);
+
   const play = useCallback(async () => {
     setStarted(true);
     setEnded(false);
+    setCountdown(null);
     await eng().play();
   }, []);
+
   const toggle = useCallback(() => {
-    if (!started || eng().t >= DURATION - 0.1 || ended) {
-      if (ended || eng().t >= DURATION - 0.1) eng().seek(0);
+    const e = eng();
+    if (!started || ended || e.t >= e.duration - 0.1) {
+      if (ended || e.t >= e.duration - 0.1) e.seek(0);
       play();
       return;
     }
-    if (eng().playing) eng().pause();
+    if (e.playing) e.pause();
     else play();
   }, [started, ended, play]);
 
@@ -95,15 +111,54 @@ export default function App() {
     (t: number) => {
       setStarted(true);
       setEnded(false);
+      setCountdown(null);
       eng().seek(t);
       if (!eng().playing) play();
     },
     [play],
   );
 
+  const pick = useCallback(
+    (i: number, autoplay = false) => {
+      const e = eng();
+      setEpIdx(i);
+      setStarted(false);
+      setEnded(false);
+      setCountdown(null);
+      setTime(EPISODES[i].posterAt);
+      setNote("");
+      e.setEpisode(EPISODES[i]);
+      if (autoplay) {
+        e.seek(0, false);
+        setStarted(true);
+        e.play();
+      }
+    },
+    [],
+  );
+
+  // auto-advance: the series plays on its own if you let it
+  useEffect(() => {
+    if (!ended || !binge || epIdx >= EPISODES.length - 1 || recording) return;
+    setCountdown(6);
+    const iv = window.setInterval(() => {
+      setCountdown((c) => {
+        if (c === null) return null;
+        if (c <= 1) {
+          window.clearInterval(iv);
+          pick(epIdx + 1, true);
+          return null;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(iv);
+  }, [ended, binge, epIdx, recording, pick]);
+
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement)?.tagName === "INPUT" && (e.target as HTMLInputElement).type === "range" && e.code !== "Space") return;
+      const tg = e.target as HTMLElement;
+      if (tg?.tagName === "INPUT" && (tg as HTMLInputElement).type === "range" && e.code !== "Space") return;
       if (e.code === "Space") {
         e.preventDefault();
         toggle();
@@ -115,75 +170,108 @@ export default function App() {
           eng().setMuted(!m);
           return !m;
         });
-      }
+      } else if (e.key >= "1" && e.key <= "4") pick(+e.key - 1);
     };
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
-  }, [toggle]);
+  }, [toggle, pick]);
 
-  const chapter = chapterAt(time);
-  const vo = useMemo(() => CHAPTERS.flatMap((c) => c.vo.map((v) => ({ ...v, c }))), []);
+  const D = ep.duration;
+  const chapter = ep.chapters.find((c) => time >= c.start && time < c.end) ?? ep.chapters[ep.chapters.length - 1];
+  const vo = useMemo(() => ep.chapters.flatMap((c) => c.vo.map((v) => ({ ...v, c }))), [ep]);
   const activeVo = vo.find((v) => time >= v.at && time < v.at + v.dur);
 
   const record = async () => {
     setStarted(true);
     setEnded(false);
     setRecording(true);
-    setNote("Recording in real time. Keep this tab in the foreground until the film ends.");
+    setNote("Recording in real time. Keep this tab in the foreground until the episode ends.");
     await eng().record((blob, ext) => {
       setRecording(false);
-      setNote(`Saved star-catcher-ep1.${ext} (${(blob.size / 1e6).toFixed(1)} MB). Score is baked in; mute it in post if you want a clean VO pass.`);
-      download(blob, `star-catcher-ep1.${ext}`);
+      setNote(`Saved star-catcher-ep${ep.roman}.${ext} (${(blob.size / 1e6).toFixed(1)} MB). Score is baked in.`);
+      download(blob, `star-catcher-ep${ep.roman}.${ext}`);
     });
   };
-
   const stopRecord = () => {
     eng().cancelRecording();
     eng().pause();
     setRecording(false);
     setNote("Recording cancelled.");
   };
-
-  const still = () => {
-    eng().out.toBlob((b) => b && download(b, `star-catcher-${fmt(eng().t).replace(":", "m")}s.png`), "image/png");
-  };
+  const still = () => eng().out.toBlob((b) => b && download(b, `star-catcher-ep${ep.roman}-${fmt(eng().t).replace(":", "m")}s.png`), "image/png");
 
   return (
     <div className="min-h-screen bg-[#05050b] text-slate-200 selection:bg-amber-300/30" style={{ fontFamily: '"Inter", system-ui, sans-serif' }}>
       <header className="mx-auto flex max-w-6xl items-end justify-between px-5 pt-7 pb-4">
         <div>
-          <p className="text-[11px] tracking-[0.42em] text-amber-200/60">EPISODE I · A SERIES IN CODE</p>
-          <h1 className="mt-1 text-3xl text-white sm:text-4xl" style={{ fontFamily: '"Cormorant Garamond", Georgia, serif', letterSpacing: "0.22em", fontWeight: 300 }}>
-            STAR CATCHER
-          </h1>
+          <p className="text-[11px] tracking-[0.42em]" style={{ color: ep.accent, opacity: 0.8 }}>EPISODE {ep.roman} · A SERIES IN CODE</p>
+          <h1 className="mt-1 text-3xl text-white sm:text-4xl" style={{ fontFamily: SERIF, letterSpacing: "0.22em", fontWeight: 300 }}>STAR CATCHER</h1>
         </div>
         <p className="hidden max-w-xs text-right text-xs leading-relaxed text-slate-400 sm:block">
-          Every frame and every note is generated by code in your browser. Five minutes. No narration yet, on purpose.
+          Four episodes. Every frame and every note generated by code in your browser. Episodes II–IV cut faster on purpose.
         </p>
       </header>
 
       <main className="mx-auto max-w-6xl px-5 pb-16">
-        {/* ------------------------------------------------------------ player */}
+        {/* ----------------------------------------------- episode rail */}
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {EPISODES.map((e, i) => (
+            <button
+              key={e.id}
+              onClick={() => pick(i)}
+              className={`group relative overflow-hidden rounded-xl p-3 text-left ring-1 transition ${i === epIdx ? "bg-white/[0.07]" : "bg-white/[0.02] hover:bg-white/[0.05]"}`}
+              style={{ ["--tw-ring-color" as any]: i === epIdx ? e.accent : "rgba(255,255,255,0.06)" }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] tracking-[0.3em]" style={{ color: e.accent }}>EPISODE {e.roman}</span>
+                {e.status === "new" && <span className="rounded bg-emerald-400/15 px-1.5 py-0.5 text-[9px] tracking-widest text-emerald-200">NEW</span>}
+              </div>
+              <div className="mt-1 text-lg leading-tight text-white" style={{ fontFamily: SERIF }}>{e.title}</div>
+              <div className="mt-1 text-[10px] tracking-wider text-slate-500">{e.bpmNote}</div>
+              <div className="absolute inset-x-0 bottom-0 h-0.5" style={{ background: e.accent, opacity: i === epIdx ? 0.9 : 0.15 }} />
+            </button>
+          ))}
+        </div>
+
+        {/* ------------------------------------------------------ player */}
         <div ref={playerRef} className="group relative overflow-hidden rounded-xl bg-black shadow-[0_0_80px_-20px_rgba(120,100,255,0.45)] ring-1 ring-white/10">
           <canvas ref={canvasRef} className="block aspect-video w-full" onClick={toggle} />
           {!started && (
-            <div className="absolute inset-0 flex flex-col items-center justify-end gap-4 bg-gradient-to-t from-black/85 via-black/20 to-transparent pb-8">
+            <div className="absolute inset-0 flex flex-col items-center justify-end gap-3 bg-gradient-to-t from-black/90 via-black/25 to-transparent pb-7">
+              <p className="max-w-lg px-6 text-center text-sm leading-relaxed text-slate-200" style={{ fontFamily: SERIF, fontSize: 18 }}>{ep.pitch}</p>
+              {ep.recap && <p className="max-w-lg px-6 text-center text-[11px] leading-relaxed text-slate-400">Previously: {ep.recap}</p>}
               <button
                 onClick={play}
-                className="flex items-center gap-3 rounded-full border border-amber-200/40 bg-black/50 px-8 py-3 text-sm tracking-[0.3em] text-amber-100 backdrop-blur transition hover:border-amber-200 hover:bg-amber-200/10"
+                className="mt-1 flex items-center gap-3 rounded-full border bg-black/50 px-8 py-3 text-sm tracking-[0.3em] backdrop-blur transition hover:bg-white/10"
+                style={{ borderColor: ep.accent, color: ep.accent }}
               >
-                <span className="text-lg">▶</span> BEGIN · 5:00
+                <span className="text-lg">▶</span> EPISODE {ep.roman} · {fmt(D)}
               </button>
-              <p className="max-w-md px-6 text-center text-[11px] leading-relaxed text-slate-400">
+              <p className="max-w-md px-6 text-center text-[10px] leading-relaxed text-slate-500">
                 Headphones recommended. Contains flashing light, intense imagery and unsettling themes. Not suitable for viewers with photosensitive epilepsy.
               </p>
             </div>
           )}
           {ended && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/55">
-              <button onClick={() => { eng().seek(0); play(); }} className="rounded-full border border-white/30 px-7 py-3 text-xs tracking-[0.3em] hover:bg-white/10">
-                ↺ WATCH AGAIN
-              </button>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60">
+              {epIdx < EPISODES.length - 1 ? (
+                <>
+                  <button
+                    onClick={() => pick(epIdx + 1, true)}
+                    className="rounded-full border px-8 py-3 text-xs tracking-[0.3em] hover:bg-white/10"
+                    style={{ borderColor: EPISODES[epIdx + 1].accent, color: EPISODES[epIdx + 1].accent }}
+                  >
+                    NEXT · EPISODE {EPISODES[epIdx + 1].roman} · {EPISODES[epIdx + 1].title.toUpperCase()}
+                    {countdown !== null && <span className="ml-3 text-slate-400">{countdown}</span>}
+                  </button>
+                  <label className="flex cursor-pointer items-center gap-2 text-[11px] tracking-widest text-slate-400">
+                    <input type="checkbox" checked={binge} onChange={(e) => { setBinge(e.target.checked); if (!e.target.checked) setCountdown(null); }} /> AUTO-PLAY NEXT
+                  </label>
+                </>
+              ) : (
+                <p className="text-sm tracking-[0.4em] text-amber-100" style={{ fontFamily: SERIF }}>THE END</p>
+              )}
+              <button onClick={() => { eng().seek(0); play(); }} className="rounded-full border border-white/30 px-6 py-2 text-[11px] tracking-[0.3em] hover:bg-white/10">↺ WATCH AGAIN</button>
             </div>
           )}
           {recording && (
@@ -193,88 +281,84 @@ export default function App() {
           )}
         </div>
 
-        {/* ---------------------------------------------------------- controls */}
+        {/* ------------------------------------------------------ controls */}
         <div className="mt-3 rounded-xl bg-white/[0.03] px-4 py-3 ring-1 ring-white/5">
           <div className="relative h-8">
-            {/* chapter + VO markers */}
             <div className="pointer-events-none absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 overflow-hidden rounded-full bg-white/10">
-              {CHAPTERS.map((c, i) => (
-                <div key={c.id} className="absolute top-0 h-full border-l border-black/70" style={{ left: `${(c.start / DURATION) * 100}%`, width: `${((c.end - c.start) / DURATION) * 100}%`, background: i % 2 ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.09)" }} />
+              {ep.chapters.map((c, i) => (
+                <div key={c.id} className="absolute top-0 h-full border-l border-black/70" style={{ left: `${(c.start / D) * 100}%`, width: `${((c.end - c.start) / D) * 100}%`, background: i % 2 ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.09)" }} />
               ))}
               {vo.map((v, i) => (
-                <div key={i} className="absolute top-0 h-full bg-amber-300/50" style={{ left: `${(v.at / DURATION) * 100}%`, width: `${(v.dur / DURATION) * 100}%` }} />
+                <div key={i} className="absolute top-0 h-full bg-amber-300/50" style={{ left: `${(v.at / D) * 100}%`, width: `${(v.dur / D) * 100}%` }} />
               ))}
-              <div className="absolute top-0 left-0 h-full bg-violet-400/70" style={{ width: `${(time / DURATION) * 100}%` }} />
+              <div className="absolute top-0 left-0 h-full" style={{ width: `${(time / D) * 100}%`, background: ep.accent, opacity: 0.75 }} />
             </div>
             <input
-              type="range"
-              min={0}
-              max={DURATION}
-              step={0.1}
-              value={time}
-              aria-label="Seek"
-              onChange={(e) => {
-                setTime(+e.target.value);
-                eng().seek(+e.target.value, false);
-              }}
+              type="range" min={0} max={D} step={0.1} value={time} aria-label="Seek"
+              onChange={(e) => { setTime(+e.target.value); eng().seek(+e.target.value, false); }}
               onPointerUp={(e) => eng().seek(+(e.target as HTMLInputElement).value, true)}
               onKeyUp={(e) => eng().seek(+(e.target as HTMLInputElement).value, true)}
               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             />
-            <div className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_14px_rgba(180,160,255,0.9)]" style={{ left: `${(time / DURATION) * 100}%` }} />
+            <div className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_14px_rgba(180,160,255,0.9)]" style={{ left: `${(time / D) * 100}%` }} />
           </div>
           <div className="mt-1 flex items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2">
-              <button onClick={toggle} className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20" aria-label={playing ? "Pause" : "Play"}>
-                {playing ? "❚❚" : "▶"}
-              </button>
-              <button onClick={() => jump(Math.max(0, chapter.start - (time - chapter.start < 2 ? 1 : 0)))} className="rounded px-2 py-1 text-[10px] tracking-widest text-slate-400 hover:text-white" title="Chapter start">
-                PREV
-              </button>
-              <span className="tabular-nums text-slate-300">{fmt(time)} <span className="text-slate-600">/ 5:00</span></span>
+              <button onClick={toggle} className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20" aria-label={playing ? "Pause" : "Play"}>{playing ? "❚❚" : "▶"}</button>
+              <button onClick={() => jump(Math.max(0, chapter.start - (time - chapter.start < 2 ? 1 : 0)))} className="rounded px-2 py-1 text-[10px] tracking-widest text-slate-400 hover:text-white">PREV</button>
+              <button onClick={() => jump(Math.min(D - 1, chapter.end + 0.01))} className="rounded px-2 py-1 text-[10px] tracking-widest text-slate-400 hover:text-white">NEXT</button>
+              <span className="tabular-nums text-slate-300">{fmt(time)} <span className="text-slate-600">/ {fmt(D)}</span></span>
             </div>
             <div className="min-w-0 flex-1 truncate text-center text-slate-400">
-              <span className="text-amber-200/70">{chapter.n}.</span> {chapter.title}
+              <span style={{ color: ep.accent }}>{chapter.n}.</span> {chapter.title}
               {activeVo && <span className="ml-3 rounded bg-amber-300/15 px-2 py-0.5 text-[10px] tracking-widest text-amber-200">VO WINDOW</span>}
             </div>
             <div className="flex items-center gap-1">
-              <button
-                onClick={() => { eng().setMuted(!muted); setMuted(!muted); }}
-                className="rounded px-2 py-1 text-[10px] tracking-widest text-slate-400 hover:text-white"
-                aria-label="Mute"
-              >
-                {muted ? "UNMUTE" : "MUTE"}
-              </button>
-              <button onClick={() => playerRef.current?.requestFullscreen?.()} className="rounded px-2 py-1 text-[10px] tracking-widest text-slate-400 hover:text-white" aria-label="Fullscreen">
-                FULLSCREEN
-              </button>
+              <button onClick={() => { eng().setMuted(!muted); setMuted(!muted); }} className="rounded px-2 py-1 text-[10px] tracking-widest text-slate-400 hover:text-white">{muted ? "UNMUTE" : "MUTE"}</button>
+              <button onClick={() => playerRef.current?.requestFullscreen?.()} className="rounded px-2 py-1 text-[10px] tracking-widest text-slate-400 hover:text-white">FULLSCREEN</button>
             </div>
           </div>
-          <p className="mt-1 text-[10px] tracking-wider text-slate-600">SPACE play/pause · ← → ±5s · F fullscreen · M mute</p>
+          <p className="mt-1 text-[10px] tracking-wider text-slate-600">SPACE play/pause · ← → ±5s · 1–4 episode · F fullscreen · M mute</p>
+          {(ep.id === "ep1" || ep.id === "ep2") && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2.5">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] tracking-widest text-slate-400">AUDIO TRACK:</span>
+                {[
+                  ["suno-master", "🎙️ Suno Master (VO + Score)"],
+                  ["suno-score", "🎵 Suno Score"],
+                  ["suno-vo", "🗣️ Suno VO"],
+                  ["procedural", "💻 Code Synth"],
+                ].map(([m, label]) => (
+                  <button
+                    key={m}
+                    onClick={() => changeAudioMode(m as any)}
+                    className={`rounded-md px-2.5 py-1 text-[10px] tracking-wider transition ${audioMode === m ? "bg-amber-400/20 text-amber-200 ring-1 ring-amber-400/30" : "text-slate-400 hover:bg-white/5 hover:text-slate-200"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-[10px] tracking-wider text-slate-500">Stitched with Suno Speech & Music</span>
+            </div>
+          )}
         </div>
 
-        {/* -------------------------------------------------------------- tabs */}
-        <nav className="mt-8 flex gap-1 border-b border-white/10 text-xs tracking-[0.2em]">
-          {([["chapters", "CHAPTERS"], ["narration", "NARRATION MAP"], ["series", "SERIES BIBLE"], ["export", "EXPORT"]] as [Tab, string][]).map(([k, label]) => (
-            <button key={k} onClick={() => setTab(k)} className={`px-4 py-3 transition ${tab === k ? "border-b-2 border-amber-200 text-amber-100" : "text-slate-500 hover:text-slate-300"}`}>
-              {label}
-            </button>
+        {/* ---------------------------------------------------------- tabs */}
+        <nav className="mt-8 flex flex-wrap gap-1 border-b border-white/10 text-xs tracking-[0.2em]">
+          {([["chapters", "CHAPTERS"], ["narration", "NARRATION MAP"], ["bible", "SERIES BIBLE"], ["export", "EXPORT"]] as [Tab, string][]).map(([k, label]) => (
+            <button key={k} onClick={() => setTab(k)} className={`px-4 py-3 transition ${tab === k ? "border-b-2 text-white" : "text-slate-500 hover:text-slate-300"}`} style={tab === k ? { borderColor: ep.accent } : undefined}>{label}</button>
           ))}
         </nav>
 
         {tab === "chapters" && (
           <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {CHAPTERS.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => jump(c.start)}
-                className={`group rounded-xl p-4 text-left ring-1 transition ${chapter.id === c.id ? "bg-violet-400/10 ring-violet-300/40" : "bg-white/[0.03] ring-white/5 hover:bg-white/[0.06]"}`}
-              >
+            {ep.chapters.map((c) => (
+              <button key={c.id} onClick={() => jump(c.start)} className={`rounded-xl p-4 text-left ring-1 transition ${chapter.id === c.id ? "bg-white/[0.07] ring-white/30" : "bg-white/[0.03] ring-white/5 hover:bg-white/[0.06]"}`}>
                 <div className="flex items-baseline justify-between">
-                  <span className="text-[10px] tracking-[0.3em] text-amber-200/70">CHAPTER {c.n}</span>
+                  <span className="text-[10px] tracking-[0.3em]" style={{ color: ep.accent }}>CHAPTER {c.n}</span>
                   <span className="text-[11px] tabular-nums text-slate-500">{fmt(c.start)}–{fmt(c.end)}</span>
                 </div>
-                <h3 className="mt-1 text-lg text-white" style={{ fontFamily: '"Cormorant Garamond", Georgia, serif' }}>{c.title}</h3>
+                <h3 className="mt-1 text-lg text-white" style={{ fontFamily: SERIF }}>{c.title}</h3>
                 <p className="mt-1 text-xs leading-relaxed text-slate-400">{c.logline}</p>
                 <p className="mt-2 text-[10px] tracking-wider text-slate-600">↳ {c.homage}</p>
               </button>
@@ -284,85 +368,72 @@ export default function App() {
 
         {tab === "narration" && (
           <section className="mt-5">
-            <p className="max-w-2xl text-sm leading-relaxed text-slate-400">
-              The film is silent of voice by design. The amber blocks are windows where the score breathes and the picture holds, built for your narration. Click a window to audition it.
-            </p>
+            <p className="max-w-2xl text-sm leading-relaxed text-slate-400">The episodes are silent of voice by design. Amber blocks are windows where the score breathes and the picture holds, built for narration. Click one to audition it.</p>
             <div className="mt-5 space-y-2">
               {vo.map((v, i) => (
                 <button key={i} onClick={() => jump(Math.max(0, v.at - 1))} className="flex w-full items-start gap-4 rounded-lg bg-white/[0.03] p-3 text-left ring-1 ring-white/5 hover:bg-white/[0.06]">
                   <div className="w-28 shrink-0 text-xs tabular-nums text-amber-200">{fmtMs(v.at)} → {fmtMs(v.at + v.dur)}</div>
-                  <div className="text-xs leading-relaxed text-slate-300">
-                    <span className="mr-2 text-slate-500">Ch.{v.c.n} {v.c.title}</span>
-                    {v.note}
-                  </div>
+                  <div className="text-xs leading-relaxed text-slate-300"><span className="mr-2 text-slate-500">Ch.{v.c.n} {v.c.title}</span>{v.note}</div>
                 </button>
               ))}
             </div>
           </section>
         )}
 
-        {tab === "series" && (
+        {tab === "bible" && (
           <section className="mt-5 grid gap-6 lg:grid-cols-2">
             <div className="space-y-3">
-              {SERIES.map((e) => (
-                <div key={e.n} className="rounded-xl bg-white/[0.03] p-4 ring-1 ring-white/5">
+              {EPISODES.map((e, i) => (
+                <button key={e.id} onClick={() => pick(i)} className="block w-full rounded-xl bg-white/[0.03] p-4 text-left ring-1 ring-white/5 hover:bg-white/[0.06]">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] tracking-[0.3em] text-amber-200/70">EPISODE {e.n}</span>
-                    <span className={`rounded px-2 py-0.5 text-[10px] tracking-widest ${e.status === "released" ? "bg-emerald-400/15 text-emerald-200" : e.status === "next" ? "bg-violet-400/15 text-violet-200" : "bg-white/5 text-slate-500"}`}>
-                      {e.status.toUpperCase()}
-                    </span>
+                    <span className="text-[10px] tracking-[0.3em]" style={{ color: e.accent }}>EPISODE {e.roman} · {fmt(e.duration)}</span>
+                    <span className="rounded bg-emerald-400/15 px-2 py-0.5 text-[10px] tracking-widest text-emerald-200">RELEASED</span>
                   </div>
-                  <h3 className="mt-1 text-lg text-white" style={{ fontFamily: '"Cormorant Garamond", Georgia, serif' }}>{e.title}</h3>
+                  <h3 className="mt-1 text-lg text-white" style={{ fontFamily: SERIF }}>{e.title}</h3>
                   <p className="mt-1 text-xs leading-relaxed text-slate-400">{e.pitch}</p>
-                </div>
+                </button>
               ))}
             </div>
-            <div className="rounded-xl bg-white/[0.03] p-5 text-sm leading-relaxed text-slate-300 ring-1 ring-white/5">
-              <h3 className="text-[11px] tracking-[0.3em] text-amber-200/80">PLANTED FOR LATER</h3>
-              <ul className="mt-3 space-y-3 text-xs text-slate-400">
-                <li><b className="text-slate-200">The belly map.</b> The Mother's constellation is a portrait of the Star Catcher: hat, lantern pole, arms. His chest star stayed dark until he gave it away.</li>
-                <li><b className="text-slate-200">The drowned sky.</b> The sea reflects what is really up there. Eyes. Always eyes.</li>
-                <li><b className="text-slate-200">The lanterns.</b> They rose into her belly in Chapter 4. They were never lanterns.</li>
-                <li><b className="text-slate-200">The pilot.</b> In the white room he turns to dust and the hat stays behind. Who woke the empty machine at 4:55?</li>
-                <li><b className="text-slate-200">The top.</b> It was still spinning when we cut away.</li>
-                <li><b className="text-slate-200">The heartbeat.</b> It moves from the mech to the child, then returns once, alone, at the end.</li>
-                <li><b className="text-slate-200">The lullaby.</b> D minor, then major, then warped. It will come back wrong.</li>
-              </ul>
-              <p className="mt-4 text-[11px] text-slate-500">New episodes drop into <code className="text-slate-300">src/film/scenes</code> and <code className="text-slate-300">timeline.ts</code>. The engine, palette and heartbeat spine are shared.</p>
+            <div className="rounded-xl bg-white/[0.03] p-5 ring-1 ring-white/5">
+              <h3 className="text-[11px] tracking-[0.3em] text-amber-200/80">HOW THE MOTIFS TRAVEL</h3>
+              <div className="mt-3 space-y-4 text-xs text-slate-400">
+                {MOTIFS.map((m) => (
+                  <div key={m.k}>
+                    <b className="text-slate-200">{m.k}</b>
+                    <ol className="mt-1 space-y-0.5">{m.v.map((l, i) => <li key={i}><span className="mr-2 text-slate-600">{["I", "II", "III", "IV"][i]}</span>{l}</li>)}</ol>
+                  </div>
+                ))}
+              </div>
+              <h3 className="mt-6 text-[11px] tracking-[0.3em] text-amber-200/80">PACING NOTE</h3>
+              <p className="mt-2 text-xs leading-relaxed text-slate-400">Ep. I breathes at 5:00 with ~40 s chapters. Episodes II–IV run 3:00–3:30 with a hard cut every 4–10 s, a groove-driven score in the action chapters (up to 154 BPM), and hit-stop slow-motion on key impacts.</p>
             </div>
           </section>
         )}
 
         {tab === "export" && (
-          <section className="mt-5 grid gap-4 md:grid-cols-3">
-            <div className="rounded-xl bg-white/[0.03] p-5 ring-1 ring-white/5">
-              <h3 className="text-[11px] tracking-[0.3em] text-amber-200/80">RECORD THE FILM</h3>
-              <p className="mt-2 text-xs leading-relaxed text-slate-400">
-                Captures the 1920×1080 canvas and the score in real time to a WebM file for your editor. Best in desktop Chrome or Edge. Leave the tab in the foreground.
-              </p>
-              {!recording ? (
-                <button onClick={record} className="mt-4 rounded-full bg-amber-200 px-5 py-2 text-xs font-medium tracking-[0.2em] text-black hover:bg-amber-100">● RECORD 5:00</button>
+          <section className="mt-5 grid gap-4 sm:grid-cols-3">
+            <div className="rounded-xl bg-white/[0.03] p-4 ring-1 ring-white/5">
+              <h3 className="text-sm text-white">Record episode {ep.roman}</h3>
+              <p className="mt-1 text-xs leading-relaxed text-slate-400">Captures the canvas and score in real time to a video file. Keep the tab in front for {fmt(D)}.</p>
+              {recording ? (
+                <button onClick={stopRecord} className="mt-3 rounded-full border border-red-400/50 px-4 py-2 text-[11px] tracking-widest text-red-300">STOP</button>
               ) : (
-                <button onClick={stopRecord} className="mt-4 rounded-full bg-red-400 px-5 py-2 text-xs font-medium tracking-[0.2em] text-black">■ STOP</button>
+                <button onClick={record} className="mt-3 rounded-full border border-white/30 px-4 py-2 text-[11px] tracking-widest hover:bg-white/10">● RECORD</button>
               )}
             </div>
-            <div className="rounded-xl bg-white/[0.03] p-5 ring-1 ring-white/5">
-              <h3 className="text-[11px] tracking-[0.3em] text-amber-200/80">SAVE THE CURRENT FRAME</h3>
-              <p className="mt-2 text-xs leading-relaxed text-slate-400">A full-resolution PNG of whatever is on screen right now. Scrub, then save.</p>
-              <button onClick={still} className="mt-4 rounded-full border border-white/20 px-5 py-2 text-xs tracking-[0.2em] hover:bg-white/10">SAVE PNG</button>
+            <div className="rounded-xl bg-white/[0.03] p-4 ring-1 ring-white/5">
+              <h3 className="text-sm text-white">Still frame</h3>
+              <p className="mt-1 text-xs leading-relaxed text-slate-400">Save the current frame as a 1920×1080 PNG.</p>
+              <button onClick={still} className="mt-3 rounded-full border border-white/30 px-4 py-2 text-[11px] tracking-widest hover:bg-white/10">SAVE PNG</button>
             </div>
-            <div className="rounded-xl bg-white/[0.03] p-5 ring-1 ring-white/5">
-              <h3 className="text-[11px] tracking-[0.3em] text-amber-200/80">POST-PRODUCTION SHEET</h3>
-              <p className="mt-2 text-xs leading-relaxed text-slate-400">Chapters, timecoded VO windows with tone notes, homages, series bible and motifs, as Markdown.</p>
-              <button onClick={() => download(new Blob([cueSheet()], { type: "text/markdown" }), "star-catcher-ep1-cue-sheet.md")} className="mt-4 rounded-full border border-white/20 px-5 py-2 text-xs tracking-[0.2em] hover:bg-white/10">DOWNLOAD .MD</button>
+            <div className="rounded-xl bg-white/[0.03] p-4 ring-1 ring-white/5">
+              <h3 className="text-sm text-white">Cue sheet</h3>
+              <p className="mt-1 text-xs leading-relaxed text-slate-400">Chapters, homages and narration windows as Markdown.</p>
+              <button onClick={() => download(new Blob([cueSheet(ep)], { type: "text/markdown" }), `star-catcher-ep${ep.roman}-cues.md`)} className="mt-3 rounded-full border border-white/30 px-4 py-2 text-[11px] tracking-widest hover:bg-white/10">DOWNLOAD .MD</button>
             </div>
-            {note && <p className="md:col-span-3 rounded-lg bg-violet-400/10 px-4 py-3 text-xs text-violet-100">{note}</p>}
+            {note && <p className="text-xs text-slate-400 sm:col-span-3">{note}</p>}
           </section>
         )}
-
-        <footer className="mt-14 border-t border-white/5 pt-6 text-[11px] leading-relaxed text-slate-600">
-          Reimagined from the 90-second <i>Star Catcher</i> short by anstapnever. Homage to E.T., Interstellar, Inception and 2001: A Space Odyssey. All imagery and music synthesized live. No video or image models, no samples.
-        </footer>
       </main>
     </div>
   );

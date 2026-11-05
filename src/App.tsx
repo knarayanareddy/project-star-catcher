@@ -319,28 +319,26 @@ export default function App() {
             </div>
           </div>
           <p className="mt-1 text-[10px] tracking-wider text-slate-600">SPACE play/pause · ← → ±5s · 1–4 episode · F fullscreen · M mute</p>
-          {(ep.id === "ep1" || ep.id === "ep2") && (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2.5">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[10px] tracking-widest text-slate-400">AUDIO TRACK:</span>
-                {[
-                  ["suno-master", "🎙️ Suno Master (VO + Score)"],
-                  ["suno-score", "🎵 Suno Score"],
-                  ["suno-vo", "🗣️ Suno VO"],
-                  ["procedural", "💻 Code Synth"],
-                ].map(([m, label]) => (
-                  <button
-                    key={m}
-                    onClick={() => changeAudioMode(m as any)}
-                    className={`rounded-md px-2.5 py-1 text-[10px] tracking-wider transition ${audioMode === m ? "bg-amber-400/20 text-amber-200 ring-1 ring-amber-400/30" : "text-slate-400 hover:bg-white/5 hover:text-slate-200"}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <span className="text-[10px] tracking-wider text-slate-500">Stitched with Suno Speech & Music</span>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] tracking-widest text-slate-400">AUDIO TRACK:</span>
+              {[
+                ["suno-master", "🎙️ Suno Master (VO + Score)"],
+                ["suno-score", "🎵 Suno Score"],
+                ["suno-vo", "🗣️ Suno VO"],
+                ["procedural", "💻 Code Synth"],
+              ].map(([m, label]) => (
+                <button
+                  key={m}
+                  onClick={() => changeAudioMode(m as any)}
+                  className={`rounded-md px-2.5 py-1 text-[10px] tracking-wider transition ${audioMode === m ? "bg-amber-400/20 text-amber-200 ring-1 ring-amber-400/30" : "text-slate-400 hover:bg-white/5 hover:text-slate-200"}`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
-          )}
+            <span className="text-[10px] tracking-wider text-slate-500">Stitched with Suno Speech & Music</span>
+          </div>
         </div>
 
         {/* ---------------------------------------------------------- tabs */}

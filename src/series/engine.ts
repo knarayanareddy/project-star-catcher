@@ -126,8 +126,8 @@ export class SeriesEngine {
     this.score = null;
     if (!this.actx || !this.mix || !this.recDest) return;
 
-    if ((this.ep.id === "ep1" || this.ep.id === "ep2") && this.audioMode !== "procedural") {
-      const epNum = this.ep.id === "ep1" ? "1" : "2";
+    if (this.audioMode !== "procedural") {
+      const epNum = this.ep.id.replace("ep", "");
       let src = `/audio/${this.ep.id}/suno_episode${epNum}_master.mp3`;
       if (this.audioMode === "suno-score") src = `/audio/${this.ep.id}/suno_score_full.mp3`;
       if (this.audioMode === "suno-vo") src = `/audio/${this.ep.id}/suno_narration_synced.mp3`;

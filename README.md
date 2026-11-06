@@ -29,6 +29,21 @@
 
 ---
 
+## Story Development
+
+**[Open the organized story library](docs/story-development/README.md).** Each storyline has its own folder and a `README.md` explaining what to use for generation:
+
+- [Star Catcher](docs/story-development/star-catcher/README.md) — arc review and original production-file map.
+- [Good Mourning](docs/story-development/good-mourning/README.md) — bible, scene treatments, six full first-draft screenplays, and continuity ledger.
+- [The Republic of Tomorrow](docs/story-development/the-republic-of-tomorrow/README.md) — bible and six detailed episode outlines.
+- [Nobody Owns Tuesday](docs/story-development/nobody-owns-tuesday/README.md) — bible and six detailed episode outlines.
+- [The Department of Missing Rooms](docs/story-development/the-department-of-missing-rooms/README.md) — six four-minute narrated episodes, picture/sound beats, and narration-only files.
+- [The Town That Forgot the Dark](docs/story-development/the-town-that-forgot-the-dark/README.md) — six four-minute narrated episodes, picture/sound beats, and narration-only files.
+
+Cross-project comparisons and the consolidated audio-tool discussion are in [shared reference](docs/story-development/shared/README.md). The new-series materials are development documents, not implemented episodes. The existing player and original production assets remain unchanged.
+
+---
+
 ## Getting Started
 
 ### Prerequisites

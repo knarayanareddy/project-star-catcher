@@ -1,6 +1,6 @@
 import { Post, defaultFX } from "./post";
 import { Sound } from "./audio";
-import { C, circle, corrLine, fillRR, mono, txt } from "./draw";
+import { C, circle, corrLine, fillRR, mono, txt, setFigureClock } from "./draw";
 import { BEAT_LEN, EP_LEN, H, W, clamp, easeOut, pad, prog } from "./util";
 import { EPISODES, cuesFor, type EpisodeData } from "../story/episodes";
 import type { EpisodeScene } from "../scenes/common";
@@ -17,6 +17,9 @@ export interface Settings {
 export class Player {
   scene: HTMLCanvasElement;
   sctx: CanvasRenderingContext2D;
+  /** the scene is drawn flat here, then passed through the "camera operator" onto `scene` */
+  raw: HTMLCanvasElement;
+  rctx: CanvasRenderingContext2D;
   post: Post;
   ep: EpisodeData;
   sc: EpisodeScene;
@@ -36,6 +39,10 @@ export class Player {
     this.scene.width = W;
     this.scene.height = H;
     this.sctx = this.scene.getContext("2d", { alpha: false })!;
+    this.raw = document.createElement("canvas");
+    this.raw.width = W;
+    this.raw.height = H;
+    this.rctx = this.raw.getContext("2d", { alpha: false })!;
     this.post = new Post(out, this.scene);
     this.ep = ep;
     this.sc = SCENES[ep.id];
@@ -67,15 +74,45 @@ export class Player {
     this.seek(0.0);
   }
 
+  /** Virtual camera operator: handheld drift, slow breathing push, and a punch-in on every hard cut. */
+  private camera(t: number) {
+    let punch = 0;
+    let kick = 0;
+    for (const cut of this.sc.cuts) {
+      const d = t - cut;
+      if (d >= 0 && d < 0.9) {
+        punch = Math.max(punch, (1 - easeOut(d / 0.9)) * 0.085);
+        kick = Math.max(kick, (1 - d / 0.45 > 0 ? 1 - d / 0.45 : 0) * 9);
+      }
+    }
+    const z = 1.034 + 0.016 * Math.sin(t * 0.33) + punch;
+    const dx = 7 * Math.sin(t * 0.9) + 4 * Math.sin(t * 2.3 + 1) + kick * Math.sin(t * 61);
+    const dy = 5 * Math.sin(t * 1.1 + 2) + 3 * Math.sin(t * 2.9) + kick * Math.cos(t * 47);
+    const rot = 0.0028 * Math.sin(t * 0.7) + kick * 0.0009 * Math.sin(t * 33);
+    return { z, dx, dy, rot };
+  }
+
   render(t: number) {
     const fx = defaultFX();
-    this.sctx.fillStyle = "#000";
-    this.sctx.fillRect(0, 0, W, H);
+    setFigureClock(t);
+    this.rctx.fillStyle = "#000";
+    this.rctx.fillRect(0, 0, W, H);
     try {
-      this.sc.render(this.sctx, t, fx);
+      this.sc.render(this.rctx, t, fx);
     } catch (e) {
       console.error(e);
     }
+    const cam = this.camera(t);
+    const g = this.sctx;
+    g.fillStyle = "#000";
+    g.fillRect(0, 0, W, H);
+    g.save();
+    g.translate(W / 2 + cam.dx, H / 2 + cam.dy);
+    g.rotate(cam.rot);
+    g.scale(cam.z, cam.z);
+    g.translate(-W / 2, -H / 2);
+    g.drawImage(this.raw, 0, 0);
+    g.restore();
     this.post.render(fx, t, (c) => this.overlay(c, t));
   }
 

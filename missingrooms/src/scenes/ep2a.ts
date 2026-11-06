@@ -23,7 +23,7 @@ import {
 } from "../engine/draw";
 import { H, W, bump, clamp, easeInOut, easeOut, lerp, prog, smooth } from "../engine/util";
 import type { FX } from "../engine/post";
-import { backFigure, camera, cueTimes } from "./common";
+import { applyWalk, backFigure, camera, cueTimes } from "./common";
 import { finger } from "./ep1";
 
 export const FY = 642;
@@ -263,6 +263,13 @@ export function beat1(ctx: Ctx, lt: number, fx: FX) {
     if (lt > 22.6) ax = lerp(780, 1030, back);
     const af: 1 | -1 = lt > 22.2 && lt < 25 ? 1 : -1;
     const ap = poses.stand(Math.sin(lt * 1.4));
+    const axAt = (l: number) => {
+      let a = 1000;
+      if (l > 20.6) a = lerp(1000, 780, easeInOut(prog(l, 20.6, 21.6)));
+      if (l > 22.6) a = lerp(780, 1030, easeInOut(prog(l, 22.6, 24.0)));
+      return a;
+    };
+    applyWalk(ap, axAt(lt - 0.05), axAt(lt + 0.05), 0.1, h * 0.97, af, 1.0);
     const AL = hl(ax, h * 0.97, af);
     let tapeA: V2 = [520, 300];
     let tapeB: V2 = [800, 262];
@@ -480,8 +487,8 @@ export function beat2(ctx: Ctx, lt: number, fx: FX) {
     return;
   }
   const open = easeInOut(prog(lt, 7.2, 9.4));
-  const cam = prog(lt, 9, 45) * 0.9;
-  const vx = 700;
+  const cam = (1 - Math.pow(1 - prog(lt, 8.4, 45), 1.7)) * 1.55;
+  const vx = 700 + Math.sin(lt * 0.42) * 46;
   const vy = 300;
   const f = 700;
   const P = (X: number, Y: number, Z: number): V2 => [vx + (X * f) / (Z - cam), vy + (Y * f) / (Z - cam)];
@@ -550,11 +557,7 @@ export function beat2(ctx: Ctx, lt: number, fx: FX) {
     ctx.fillRect(x, y + Math.sin(lt + i) * 5, 3, 1.3);
   }
   // Orrin from behind, small in the corner, recorder raised
-  backFigure(ctx, 130, 760, 440, lt * 0.0);
-  ctx.save();
-  fillRR(ctx, 190, 466, 18, 38, 3, "#2b2733", "rgba(0,0,0,0.8)", 1.4);
-  circle(ctx, 199, 474, 3, C.red);
-  ctx.restore();
+  backFigure(ctx, 150 + Math.sin(lt * 0.5) * 24, 790 - Math.min(1, prog(lt, 9, 14)) * 20, 470, lt * 0.55, "#3b3547", true);
   // hatch panels sliding open
   if (open < 1) {
     const pw = (W / 2) * (1 - open);

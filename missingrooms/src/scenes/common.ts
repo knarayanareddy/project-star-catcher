@@ -1,4 +1,4 @@
-import { C, Ctx, circle, fillRR, line, mono, poly, rr, txt, wallpaper, flower, lightPool } from "../engine/draw";
+import { CAST, drawBackFigure, poses, type Pose, C, Ctx, circle, fillRR, line, mono, poly, txt, wallpaper, flower, lightPool } from "../engine/draw";
 import { BEAT_LEN, H, W, clamp, easeInOut, lerp } from "../engine/util";
 import { cuesFor, EPISODES } from "../story/episodes";
 import type { EpisodeSound, SoundCue } from "../engine/audio";
@@ -530,27 +530,9 @@ export function paperCorridor(ctx: Ctx, p: number, camZ: number, t: number) {
 }
 
 /** The back-turned silhouette used where a rigged profile figure would break perspective. */
-export function backFigure(ctx: Ctx, x: number, y: number, h: number, ph: number, col = "#3b3547") {
-  const sw = Math.sin(ph * Math.PI * 2);
-  ctx.save();
-  ctx.fillStyle = "rgba(10,5,20,0.3)";
-  ctx.beginPath();
-  ctx.ellipse(x, y, h * 0.25, h * 0.03, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // legs
-  line(ctx, x - h * 0.05, y - h * 0.46, x - h * 0.06 - sw * h * 0.025, y - h * 0.01 + Math.max(0, sw) * -h * 0.03, "#2b2733", h * 0.075);
-  line(ctx, x + h * 0.05, y - h * 0.46, x + h * 0.06 + sw * h * 0.025, y - h * 0.01 + Math.max(0, -sw) * -h * 0.03, "#2b2733", h * 0.075);
-  // coat
-  rr(ctx, x - h * 0.13, y - h * 0.8, h * 0.26, h * 0.4, h * 0.05);
-  ctx.fillStyle = "#b8ae8f";
-  ctx.fill();
-  // arms
-  line(ctx, x - h * 0.15, y - h * 0.76, x - h * 0.15 + sw * h * 0.02, y - h * 0.5, "#a89e80", h * 0.06);
-  line(ctx, x + h * 0.15, y - h * 0.76, x + h * 0.15 - sw * h * 0.02, y - h * 0.5, "#a89e80", h * 0.06);
-  circle(ctx, x, y - h * 0.87, h * 0.075, "#6c5f58");
-  circle(ctx, x, y - h * 0.84, h * 0.07, "#6c5f58");
+export function backFigure(ctx: Ctx, x: number, y: number, h: number, ph: number, col = "#3b3547", recorder = false) {
   void col;
-  ctx.restore();
+  drawBackFigure(ctx, x, y, h, ph, CAST.orrin, { recorder });
 }
 
 /** geometry of the digits on the occupancy board, shared by drawing and the pen-hand targets */
@@ -719,4 +701,24 @@ export function familyPoster(ctx: Ctx, x: number, y: number, w: number, h: numbe
 
 export function sound(cues: SoundCue[]) {
   return cues.slice().sort((a, b) => a.t - b.t);
+}
+
+/**
+ * Turn a horizontal slide into a real walk cycle: if the figure's world-x changes between x0 and x1 (over dt seconds)
+ * its legs, hips and lean are replaced by a walk pose whose stride is locked to the ground speed (no foot sliding).
+ * Hand targets set after this call still win, so characters can walk while holding things.
+ */
+export function applyWalk(pose: Pose, x0: number, x1: number, dt: number, h: number, facing: 1 | -1, amp = 1) {
+  const vel = (x1 - x0) / dt;
+  if (Math.abs(vel) < 14) return false;
+  const mid = (x0 + x1) / 2;
+  const w = poses.walk((facing * mid) / (4 * 0.13 * amp * h), amp);
+  pose.hip = w.hip;
+  pose.lean = w.lean * (vel * facing > 0 ? 1 : 0.4);
+  pose.tilt = w.tilt;
+  pose.footF = w.footF;
+  pose.footB = w.footB;
+  pose.handF = w.handF;
+  pose.handB = w.handB;
+  return true;
 }

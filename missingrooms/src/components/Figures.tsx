@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { C, CAST, HEIGHTS, clothTape, drawFigure, fillRR, line, poses, txt, mono, circle, lightPool, type Pose } from "../engine/draw";
+import { C, CAST, setFigureClock, HEIGHTS, clothTape, drawFigure, fillRR, line, poses, txt, mono, circle, lightPool, type Pose } from "../engine/draw";
 import { PRINCIPALS, OCCUPANTS } from "../story/characters";
 
 function bgFor(ctx: CanvasRenderingContext2D, w: number, h: number, floor: number, hue = "#2b2038") {
@@ -60,7 +60,16 @@ export function Portrait({ cast, className = "" }: { cast: string; className?: s
     const c = ref.current;
     if (!c) return;
     const ctx = c.getContext("2d")!;
-    drawPortrait(ctx, c.width, c.height, cast);
+    let raf = 0;
+    const t0 = performance.now() + Math.random() * 3000;
+    const loop = (now: number) => {
+      setFigureClock((now - t0) / 1000);
+      ctx.clearRect(0, 0, c.width, c.height);
+      drawPortrait(ctx, c.width, c.height, cast);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
   }, [cast]);
   return <canvas ref={ref} width={420} height={560} className={className} />;
 }

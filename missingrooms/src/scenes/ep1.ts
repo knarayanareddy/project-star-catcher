@@ -10,6 +10,7 @@ import {
   corrCircle,
   corrLine,
   drawFigure,
+  getFigureClock,
   fillRR,
   line,
   mono,
@@ -99,20 +100,153 @@ function tube(ctx: Ctx, x: number, y: number, len: number, rot: number) {
 }
 
 export function finger(ctx: Ctx, tx: number, ty: number, ang: number, len = 360, wd = 56, skin = "#e6bd98", cuff = "#c9bf9d") {
+  const T = getFigureClock();
+  const ink = "rgba(40,24,34,0.72)";
+  const dark = (c: string, a: number) => {
+    const m = /^#([0-9a-f]{6})$/i.exec(c);
+    if (!m) return c;
+    const n = parseInt(m[1], 16);
+    const k = a / 100;
+    const ch = (v: number, to: number) => Math.round(v + (to - v) * k);
+    return `rgb(${ch((n >> 16) & 255, 42)},${ch((n >> 8) & 255, 22)},${ch(n & 255, 32)})`;
+  };
   ctx.save();
-  ctx.translate(tx, ty);
-  ctx.rotate(ang);
-  const ink = "rgba(30,22,40,0.75)";
-  rr(ctx, 0, -wd / 2, len, wd, wd / 2);
-  ctx.fillStyle = skin;
+  // living tremor: the hand is never perfectly still
+  ctx.translate(tx + Math.sin(T * 6.3) * 0.9, ty + Math.cos(T * 5.1) * 0.9);
+  ctx.rotate(ang + Math.sin(T * 1.7) * 0.006);
+
+  /* sleeve (behind everything) */
+  const sx0 = len + wd * 0.9;
+  const sg = ctx.createLinearGradient(0, -wd * 1.2, 0, wd * 1.2);
+  sg.addColorStop(0, dark(cuff, 0));
+  sg.addColorStop(0.55, cuff);
+  sg.addColorStop(1, dark(cuff, 38));
+  poly(ctx, [[sx0, -wd * 0.95], [sx0 + 900, -wd * 1.45], [sx0 + 900, wd * 1.45], [sx0, wd * 0.95]], sg as unknown as string, ink, 2.5);
+  // cuff band + stitching + folds
+  poly(ctx, [[sx0, -wd * 0.95], [sx0 + wd * 0.8, -wd * 1.03], [sx0 + wd * 0.8, wd * 1.03], [sx0, wd * 0.95]], "rgba(255,250,235,0.55)", ink, 2);
+  ctx.setLineDash([6, 6]);
+  line(ctx, sx0 + wd * 0.62, -wd * 1.0, sx0 + wd * 0.62, wd * 1.0, "rgba(40,24,34,0.4)", 1.6);
+  ctx.setLineDash([]);
+  for (let i = 0; i < 4; i++) {
+    const fx0 = sx0 + wd * 1.4 + i * wd * 1.5;
+    ctx.beginPath();
+    ctx.moveTo(fx0, -wd * (1.0 + i * 0.06));
+    ctx.quadraticCurveTo(fx0 + wd * 0.5, 0.2 * wd * (i % 2 ? 1 : -1), fx0 - wd * 0.2, wd * (1.0 + i * 0.06));
+    ctx.strokeStyle = "rgba(40,24,34,0.2)";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+  // button
+  circle(ctx, sx0 + wd * 0.4, wd * 0.62, wd * 0.07, "#f4efe0", ink, 1.2);
+
+  /* wrist + back of hand */
+  const hg = ctx.createLinearGradient(0, -wd, 0, wd * 1.4);
+  hg.addColorStop(0, "#f6d9bf");
+  hg.addColorStop(0.5, skin);
+  hg.addColorStop(1, "#b88562");
+  ctx.beginPath();
+  ctx.moveTo(len * 0.72, -wd * 0.55);
+  ctx.bezierCurveTo(len + wd * 0.2, -wd * 0.95, sx0 + wd * 0.2, -wd * 0.85, sx0 + wd * 0.3, -wd * 0.7);
+  ctx.lineTo(sx0 + wd * 0.3, wd * 0.8);
+  ctx.bezierCurveTo(len + wd * 0.3, wd * 1.35, len * 0.8, wd * 1.2, len * 0.62, wd * 0.62);
+  ctx.closePath();
+  ctx.fillStyle = hg;
   ctx.fill();
   ctx.strokeStyle = ink;
   ctx.lineWidth = 2.5;
   ctx.stroke();
-  fillRR(ctx, 4, -wd * 0.36, wd * 0.5, wd * 0.62, wd * 0.2, "#f2d6bd", ink, 1.5);
-  // cuff
-  poly(ctx, [[len - 40, -wd * 0.66], [len + 700, -wd * 1.0], [len + 700, wd * 1.0], [len - 40, wd * 0.66]], cuff, ink, 2.5);
-  line(ctx, len + 40, -wd * 0.7, len + 40, wd * 0.7, "rgba(30,22,40,0.35)", 2);
+  // tendons
+  ctx.strokeStyle = "rgba(120,70,50,0.22)";
+  ctx.lineWidth = 3;
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(len * 0.9, -wd * 0.4 + i * wd * 0.35);
+    ctx.quadraticCurveTo(len + wd * 0.5, -wd * 0.45 + i * wd * 0.4, sx0 - wd * 0.1, -wd * 0.3 + i * wd * 0.3);
+    ctx.stroke();
+  }
+
+  /* curled fingers + thumb (below the pointing finger) */
+  for (let i = 0; i < 3; i++) {
+    const cx = len * (0.66 + i * 0.07);
+    const cy = wd * (0.62 + i * 0.2);
+    const fgr = ctx.createLinearGradient(0, cy - wd * 0.3, 0, cy + wd * 0.3);
+    fgr.addColorStop(0, "#f0cfb2");
+    fgr.addColorStop(1, "#c4916c");
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, wd * 0.58, wd * 0.31, 0.12, 0, Math.PI * 2);
+    ctx.fillStyle = fgr;
+    ctx.fill();
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(120,70,50,0.3)";
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(cx - wd * 0.2, cy - wd * 0.12);
+    ctx.lineTo(cx - wd * 0.2, cy + wd * 0.12);
+    ctx.stroke();
+  }
+  // thumb
+  ctx.beginPath();
+  ctx.ellipse(len * 0.5, wd * 0.58, wd * 0.62, wd * 0.28, -0.1, 0, Math.PI * 2);
+  ctx.fillStyle = "#e3b995";
+  ctx.fill();
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+
+  /* the pointing index finger */
+  const fg = ctx.createLinearGradient(0, -wd / 2, 0, wd / 2);
+  fg.addColorStop(0, "#f7dcc3");
+  fg.addColorStop(0.45, skin);
+  fg.addColorStop(1, "#c08f6a");
+  const fingerPath = (close: boolean) => {
+    ctx.beginPath();
+    ctx.moveTo(len * 0.8, -wd * 0.58);
+    ctx.bezierCurveTo(len * 0.7, -wd * 0.56, len * 0.4, -wd * 0.5, wd * 0.42, -wd * 0.43);
+    ctx.bezierCurveTo(-wd * 0.2, -wd * 0.4, -wd * 0.18, wd * 0.42, wd * 0.42, wd * 0.43);
+    ctx.bezierCurveTo(len * 0.4, wd * 0.48, len * 0.7, wd * 0.54, len * 0.8, wd * 0.56);
+    if (close) {
+      ctx.bezierCurveTo(len * 0.86, wd * 0.3, len * 0.86, -wd * 0.3, len * 0.8, -wd * 0.58);
+      ctx.closePath();
+    }
+  };
+  fingerPath(true);
+  ctx.fillStyle = fg;
+  ctx.fill();
+  fingerPath(false);
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = 2.6;
+  ctx.stroke();
+  // soft knuckle bulge where the finger joins the hand
+  const kg = ctx.createRadialGradient(len * 0.82, 0, 0, len * 0.82, 0, wd * 0.75);
+  kg.addColorStop(0, "rgba(255,235,215,0.35)");
+  kg.addColorStop(1, "rgba(255,235,215,0)");
+  ctx.fillStyle = kg;
+  ctx.fillRect(len * 0.6, -wd, wd * 1.2 + len * 0.4, wd * 2);
+  // knuckle creases
+  ctx.strokeStyle = "rgba(120,70,50,0.38)";
+  ctx.lineWidth = 2;
+  for (const f of [0.34, 0.36, 0.62, 0.64]) {
+    ctx.beginPath();
+    ctx.moveTo(len * f, -wd * 0.42);
+    ctx.quadraticCurveTo(len * f + 5, -wd * 0.18, len * f, -wd * 0.02);
+    ctx.stroke();
+  }
+  // nail
+  ctx.beginPath();
+  ctx.moveTo(wd * 0.12, -wd * 0.3);
+  ctx.bezierCurveTo(wd * 0.5, -wd * 0.46, wd * 0.9, -wd * 0.42, wd * 1.0, -wd * 0.3);
+  ctx.bezierCurveTo(wd * 1.02, -wd * 0.12, wd * 0.5, -wd * 0.08, wd * 0.15, -wd * 0.14);
+  ctx.closePath();
+  ctx.fillStyle = "#f8e4d8";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(120,70,50,0.5)";
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+  line(ctx, wd * 0.3, -wd * 0.3, wd * 0.8, -wd * 0.33, "rgba(255,255,255,0.7)", 3);
+  // top light
+  line(ctx, wd * 0.6, -wd * 0.38, len * 0.7, -wd * 0.46, "rgba(255,255,255,0.28)", wd * 0.1);
   ctx.restore();
 }
 
@@ -282,8 +416,29 @@ function beat1(ctx: Ctx, lt: number, fx: FX) {
 
 /* ---------- BEAT 2 ---------- */
 
+/** Brisk stop-and-go survey walk: stride, stop at each door to count, stride on. */
+const B2_LEGS: [number, number, number, number][] = [
+  // [t0, t1, x0, x1]
+  [0.0, 0.9, 280, 440],
+  [2.2, 4.0, 440, 810],
+  [5.3, 7.4, 810, 1260],
+  [8.9, 10.2, 1260, 1320],
+];
+function beat2Pos(l: number) {
+  let x = 280;
+  for (const [t0, t1, x0, x1] of B2_LEGS) {
+    if (l >= t1) x = x1;
+    else if (l >= t0) {
+      const k = prog(l, t0, t1);
+      x = x0 + (x1 - x0) * (k * k * (3 - 2 * k) * 0.55 + k * 0.45);
+      break;
+    } else break;
+  }
+  return x;
+}
+
 function beat2(ctx: Ctx, lt: number, fx: FX) {
-  const posFn = (l: number) => 280 + 1040 * easeInOut(prog(l, 0, 11));
+  const posFn = beat2Pos;
   if (lt < 11) {
     const pos = posFn(lt);
     const sx = pos - 430;
@@ -305,11 +460,19 @@ function beat2(ctx: Ctx, lt: number, fx: FX) {
     const h = 330;
     const vel = (posFn(lt + 0.05) - posFn(lt - 0.05)) / 0.1;
     const walking = vel > 8;
-    const pose = walking ? walkPose(pos, h, 0.72) : poses.stand(Math.sin(lt * 1.7));
+    const pose = walking ? walkPose(pos, h, 0.95) : poses.stand(Math.sin(lt * 1.7));
     const L = hl(430, h, 1);
     pose.handF = L(430 + 38, FY - h * 0.58);
     pose.handB = L(430 + 22, FY - h * 0.5);
-    pose.tilt = walking ? -0.04 : 0;
+    if (!walking) {
+      // stop at the door: tap-count with the free hand, eyes flick between door and sheet
+      const tap = Math.max(0, Math.sin(lt * 11)) * 0.035;
+      pose.handB = L(430 + 26, FY - h * 0.5 - tap * h);
+      pose.tilt = 0.06 * Math.sin(lt * 2.4);
+      pose.gaze = Math.sin(lt * 3.1);
+      pose.brow = 0.4;
+    }
+    pose.tilt = walking ? -0.04 : pose.tilt;
     const j = orrin(ctx, 430, h, 1, pose);
     smallSheet(ctx, (j.handF[0] + j.handB[0]) / 2 + 26, j.handF[1] - 4, 72, 52, -0.1);
     // finger counting
@@ -1113,7 +1276,7 @@ const cues: SoundCue[] = ([
   { t: 22.5, type: "chirp", v: 0.35 },
   ...[0, 1, 2, 3].map((k) => ({ t: 40.2 + k * 0.62, type: "step" as const, v: 0.25 })),
   // BEAT 2
-  ...stepsFrom((t) => 280 + 1040 * easeInOut(prog(t, 0, 11)), 0, 10.9, 60, 0.3).map((c) => ({ ...c, t: c.t + B(1) })),
+  ...stepsFrom((t) => beat2Pos(t), 0, 10.9, 60, 0.3).map((c) => ({ ...c, t: c.t + B(1) })),
   { t: B(1) + 11.4, type: "swell", d: 4, v: 0.5 },
   { t: B(1) + 13.2, type: "paper", d: 0.4, v: 0.5 },
   { t: B(1) + 16.2, type: "paper", d: 0.7, v: 0.9 },

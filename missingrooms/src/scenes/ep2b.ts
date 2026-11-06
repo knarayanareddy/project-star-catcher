@@ -21,7 +21,7 @@ import {
 } from "../engine/draw";
 import { H, W, bump, clamp, easeInOut, easeOut, lerp, pad, prog, smooth } from "../engine/util";
 import type { FX } from "../engine/post";
-import { camera } from "./common";
+import { applyWalk, camera } from "./common";
 import { finger } from "./ep1";
 import { FY, att, hl, officeBG, orr } from "./ep2a";
 
@@ -899,6 +899,7 @@ export function beat5(ctx: Ctx, lt: number, fx: FX, tAbs: number) {
     let ax = 1040;
     if (lt >= 8.2) ax = lerp(1040, 790, easeInOut(prog(lt, 8.2, 9.8)));
     const ap = poses.stand(Math.sin(lt * 1.4));
+    applyWalk(ap, lt < 8.2 ? 1040 : lerp(1040, 790, easeInOut(prog(lt - 0.05, 8.2, 9.8))), lerp(1040, 790, easeInOut(prog(lt + 0.05, 8.2, 9.8))), 0.1, h * 0.97, -1, 1.0);
     const AL = hl(ax, h * 0.97, -1);
     if (lt >= 9.3 && lt < 11) ap.handF = AL(ax - 70, FY - h * 0.6);
     else if (lt >= 11 && lt < 12.4) {

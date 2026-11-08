@@ -481,8 +481,10 @@ export function sceneGargantua(ctx: CanvasRenderingContext2D, t: number, pal: Pa
     const u = i / 17;
     ctx.strokeStyle = rgba(mix3([255, 245, 220], [255, 150, 70], u), 0.5 * (1 - u));
     ctx.lineWidth = 3 - u * 2;
+    const rx = Math.max(0.1, R * (1.04 + u * 0.55));
+    const ry = Math.max(0.1, rx * (1 + u * 0.05));
     ctx.beginPath();
-    ctx.ellipse(cx, cy, R * (1.04 + u * 0.55), R * (1.04 + u * 0.55) * (1 + u * 0.05), 0, 0, TAU);
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, TAU);
     ctx.stroke();
   }
   ctx.restore();
@@ -761,7 +763,7 @@ export function sceneWhiteRoom(ctx: CanvasRenderingContext2D, t: number, _pal: P
     ctx.closePath();
     ctx.fill();
     ctx.beginPath();
-    ctx.ellipse(e[0], e[1], 175 / dt, 44 / dt, 0, 0, TAU);
+    ctx.ellipse(e[0], e[1], Math.max(0.1, 175 / Math.max(0.001, dt)), Math.max(0.1, 44 / Math.max(0.001, dt)), 0, 0, TAU);
     ctx.fillStyle = "#ffffff";
     ctx.fill();
     // hat comes to rest on the table

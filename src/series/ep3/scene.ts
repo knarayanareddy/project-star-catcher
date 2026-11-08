@@ -44,13 +44,15 @@ const SEAS = [
 function slabWorld(c: CanvasRenderingContext2D, x: number, baseY: number, h: number, t: number, hum = 1) {
   if (h < 3) return;
   for (let k = 0; k < 4; k++) {
-    const u = ((t * 0.5 + k / 4) % 1);
+    const u = (((t * 0.5 + k / 4) % 1) + 1) % 1;
+    const rx = Math.max(0.1, h * 0.3 + u * h * 2.4);
+    const ry = Math.max(0.1, rx * 0.07);
     c.save();
     c.globalCompositeOperation = "lighter";
     c.strokeStyle = rgba([180, 200, 255], 0.35 * (1 - u) * hum);
     c.lineWidth = 2;
     c.beginPath();
-    c.ellipse(x, baseY + 2, h * 0.3 + u * h * 2.4, (h * 0.3 + u * h * 2.4) * 0.07, 0, 0, TAU);
+    c.ellipse(x, baseY + 2, rx, ry, 0, 0, TAU);
     c.stroke();
     c.restore();
   }
@@ -512,14 +514,14 @@ function sceneVision(ctx: CanvasRenderingContext2D, t: number, post: Post) {
   ctx.globalCompositeOperation = "lighter";
   const speed = 0.3 + 0.2 * smooth(124, 140, t);
   for (let i = 0; i < 34; i++) {
-    const u = (i / 34 + t * speed) % 1;
-    const r = Math.pow(u, 2.4) * 1000;
+    const u = (((i / 34 + t * speed) % 1) + 1) % 1;
+    const r = Math.max(0.1, Math.pow(u, 2.4) * 1000);
     const hue = (i * 0.07 + t * 0.1) % 1;
     const col: RGB = [150 + 100 * Math.sin(hue * TAU), 150 + 100 * Math.sin(hue * TAU + 2.1), 220];
     ctx.strokeStyle = rgba(col, 0.5 * Math.sin(u * Math.PI));
     ctx.lineWidth = 1 + u * 7;
     ctx.beginPath();
-    ctx.ellipse(640, 360, r * 1.4, r * 0.8, 0, 0, TAU);
+    ctx.ellipse(640, 360, Math.max(0.1, r * 1.4), Math.max(0.1, r * 0.8), 0, 0, TAU);
     ctx.stroke();
   }
   ctx.restore();
@@ -704,15 +706,18 @@ function sceneEye(ctx: CanvasRenderingContext2D, t: number, post: Post) {
 // ===================================================================== film
 export function renderEp3(ctx: CanvasRenderingContext2D, t: number, post: Post) {
   ctx.save();
-  if (t < 17) sceneRise(ctx, t, post);
-  else if (t < 28) sceneTitle(ctx, t, post);
-  else if (t < 76) sceneSeasons(ctx, t, post);
-  else if (t < 86) sceneMother(ctx, t, post);
-  else if (t < 112) sceneBelly(ctx, t, post);
-  else if (t < 124) sceneFace(ctx, t, post);
-  else if (t < 140) sceneVision(ctx, t, post);
-  else if (t < 150) sceneDoor(ctx, t, post);
-  else if (t < 168) sceneRiseUp(ctx, t, post);
-  else sceneEye(ctx, t, post);
-  ctx.restore();
+  try {
+    if (t < 17) sceneRise(ctx, t, post);
+    else if (t < 28) sceneTitle(ctx, t, post);
+    else if (t < 76) sceneSeasons(ctx, t, post);
+    else if (t < 86) sceneMother(ctx, t, post);
+    else if (t < 112) sceneBelly(ctx, t, post);
+    else if (t < 124) sceneFace(ctx, t, post);
+    else if (t < 140) sceneVision(ctx, t, post);
+    else if (t < 150) sceneDoor(ctx, t, post);
+    else if (t < 168) sceneRiseUp(ctx, t, post);
+    else sceneEye(ctx, t, post);
+  } finally {
+    ctx.restore();
+  }
 }

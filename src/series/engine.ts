@@ -90,10 +90,25 @@ export class SeriesEngine {
 
   render(t: number) {
     const p = defaultPost();
+    this.sctx.save();
+    this.sctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.sctx.globalCompositeOperation = "source-over";
+    this.sctx.globalAlpha = 1;
+    this.sctx.filter = "none";
+    this.sctx.shadowColor = "transparent";
+    this.sctx.shadowBlur = 0;
     try {
       this.ep.render(this.sctx, t, p);
     } catch (e) {
-      console.error(e);
+      console.error(`Render error in ${this.ep.id} at t=${t}:`, e);
+    } finally {
+      this.sctx.restore();
+      this.sctx.setTransform(1, 0, 0, 1, 0, 0);
+      this.sctx.globalCompositeOperation = "source-over";
+      this.sctx.globalAlpha = 1;
+      this.sctx.filter = "none";
+      this.sctx.shadowColor = "transparent";
+      this.sctx.shadowBlur = 0;
     }
     this.post.render(p, t);
   }

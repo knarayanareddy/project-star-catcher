@@ -177,13 +177,13 @@ export function drawManta(ctx: CanvasRenderingContext2D, o: MantaOpts) {
     ctx.translate(0, -0.2);
     ctx.fillStyle = "#02030a";
     ctx.beginPath();
-    ctx.ellipse(0, 0, 0.16 * maw, 0.085 * maw, 0, 0, TAU);
+    ctx.ellipse(0, 0, Math.max(0.001, 0.16 * maw), Math.max(0.001, 0.085 * maw), 0, 0, TAU);
     ctx.fill();
     ctx.strokeStyle = rgba(o.light, 0.55);
     ctx.lineWidth = 0.003;
     for (let k = 1; k <= 5; k++) {
       ctx.beginPath();
-      ctx.ellipse(0, 0, 0.16 * maw * (k / 5.5), 0.085 * maw * (k / 5.5), 0, 0, TAU);
+      ctx.ellipse(0, 0, Math.max(0.001, 0.16 * maw * (k / 5.5)), Math.max(0.001, 0.085 * maw * (k / 5.5)), 0, 0, TAU);
       ctx.stroke();
     }
     for (let k = 0; k < 28; k++) {

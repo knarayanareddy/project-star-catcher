@@ -77,6 +77,9 @@ export function darkness(ctx: CanvasRenderingContext2D, a: number, lights: { x: 
 
 // ---------------------------------------------------------------- the deep
 export function deepGradient(ctx: CanvasRenderingContext2D, depth: number, tint: RGB = [0, 0, 0]) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 1;
   const top = mix3([20, 96, 120], tint, clamp(depth * 1.1));
   const mid = mix3([8, 52, 82], tint, clamp(depth * 1.05));
   const low = mix3([2, 18, 36], tint, clamp(depth * 0.95));
@@ -587,13 +590,15 @@ export function speedLines(ctx: CanvasRenderingContext2D, t: number, k: number, 
 }
 
 export function ring(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, col: RGB, a: number, lw = 2, sy = 1) {
-  if (a <= 0.01) return;
+  if (a <= 0.01 || Math.abs(r) <= 0.01) return;
+  const rx = Math.max(0.1, Math.abs(r));
+  const ry = Math.max(0.1, Math.abs(r * sy));
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   ctx.strokeStyle = rgba(col, a);
   ctx.lineWidth = lw;
   ctx.beginPath();
-  ctx.ellipse(x, y, r, r * sy, 0, 0, TAU);
+  ctx.ellipse(x, y, rx, ry, 0, 0, TAU);
   ctx.stroke();
   ctx.restore();
 }

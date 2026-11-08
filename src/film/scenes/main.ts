@@ -63,11 +63,13 @@ function landingFx(ctx: CanvasRenderingContext2D, ws: WorldState, t: number, opt
     glow(ctx, lx, ly, 120 + 50 * hb, [150, 225, 255], 0.8 * opts.orb);
     glow(ctx, lx, ly, 40 + 14 * hb, [255, 255, 255], opts.orb);
     for (let k = 0; k < 4; k++) {
-      const u = (t * 0.4 + k / 4) % 1;
+      const u = (((t * 0.4 + k / 4) % 1) + 1) % 1;
+      const rx = Math.max(0.1, 30 + u * 190);
+      const ry = Math.max(0.1, 4 + u * 28);
       ctx.strokeStyle = rgba(ws.pal.accent, 0.5 * (1 - u) * opts.orb);
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.ellipse(lx, ly + 2, 30 + u * 190, 4 + u * 28, 0, 0, TAU);
+      ctx.ellipse(lx, ly + 2, rx, ry, 0, 0, TAU);
       ctx.stroke();
     }
   }

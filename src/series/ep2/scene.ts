@@ -153,13 +153,15 @@ function shoreWorld(ctx: CanvasRenderingContext2D, t: number, post: Post) {
     if (t < 12.6) return;
     const hy = mechAnchors(mech).handR;
     for (let k = 0; k < 4; k++) {
-      const u = ((t - 12.8) * 0.9 + k / 4) % 1;
+      const u = (((t - 12.8) * 0.9 + k / 4) % 1 + 1) % 1;
+      const rx = Math.max(0.1, 20 + u * 120);
+      const ry = Math.max(0.1, 3 + u * 16);
       c.save();
       c.globalCompositeOperation = "lighter";
       c.strokeStyle = rgba([150, 230, 255], 0.55 * (1 - u) * smooth(12.6, 13.4, t));
       c.lineWidth = 2;
       c.beginPath();
-      c.ellipse(hy[0], BASE4 + 4, 20 + u * 120, 3 + u * 16, 0, 0, TAU);
+      c.ellipse(hy[0], BASE4 + 4, rx, ry, 0, 0, TAU);
       c.stroke();
       c.restore();
     }
@@ -882,22 +884,25 @@ function sceneAbove(ctx: CanvasRenderingContext2D, t: number, post: Post) {
 // ===================================================================== film
 export function renderEp2(ctx: CanvasRenderingContext2D, t: number, post: Post) {
   ctx.save();
-  if (t < 16) shoreWorld(ctx, t, post);
-  else if (t < 30) scenePlunge(ctx, t, post);
-  else if (t < 40) sceneFall(ctx, t, post);
-  else if (t < 46) sceneCockpit(ctx, t, post);
-  else if (t < 56) sceneSeabed(ctx, t, post);
-  else if (t < 68) sceneRiver(ctx, t, post);
-  else if (t < 82) sceneGather(ctx, t, post);
-  else if (t < 90) sceneEyes(ctx, t, post);
-  else if (t < 106) sceneChase(ctx, t, post);
-  else if (t < 118) sceneNet(ctx, t, post);
-  else if (t < 128) sceneStars(ctx, t, post);
-  else if (t < 142) sceneVillage(ctx, t, post);
-  else if (t < 152) sceneHeart(ctx, t, post);
-  else if (t < 162) sceneSurge(ctx, t, post);
-  else sceneAbove(ctx, t, post);
-  ctx.restore();
+  try {
+    if (t < 16) shoreWorld(ctx, t, post);
+    else if (t < 30) scenePlunge(ctx, t, post);
+    else if (t < 40) sceneFall(ctx, t, post);
+    else if (t < 46) sceneCockpit(ctx, t, post);
+    else if (t < 56) sceneSeabed(ctx, t, post);
+    else if (t < 68) sceneRiver(ctx, t, post);
+    else if (t < 82) sceneGather(ctx, t, post);
+    else if (t < 90) sceneEyes(ctx, t, post);
+    else if (t < 106) sceneChase(ctx, t, post);
+    else if (t < 118) sceneNet(ctx, t, post);
+    else if (t < 128) sceneStars(ctx, t, post);
+    else if (t < 142) sceneVillage(ctx, t, post);
+    else if (t < 152) sceneHeart(ctx, t, post);
+    else if (t < 162) sceneSurge(ctx, t, post);
+    else sceneAbove(ctx, t, post);
+  } finally {
+    ctx.restore();
+  }
   void noise;
   void GOLD;
   void drawSlab;

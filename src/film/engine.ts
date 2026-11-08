@@ -36,7 +36,26 @@ export class Engine {
 
   render(t: number) {
     const p = defaultPost();
-    renderFilm(this.sctx, t, p);
+    this.sctx.save();
+    this.sctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.sctx.globalCompositeOperation = "source-over";
+    this.sctx.globalAlpha = 1;
+    this.sctx.filter = "none";
+    this.sctx.shadowColor = "transparent";
+    this.sctx.shadowBlur = 0;
+    try {
+      renderFilm(this.sctx, t, p);
+    } catch (e) {
+      console.error(`Film render error at t=${t}:`, e);
+    } finally {
+      this.sctx.restore();
+      this.sctx.setTransform(1, 0, 0, 1, 0, 0);
+      this.sctx.globalCompositeOperation = "source-over";
+      this.sctx.globalAlpha = 1;
+      this.sctx.filter = "none";
+      this.sctx.shadowColor = "transparent";
+      this.sctx.shadowBlur = 0;
+    }
     this.post.render(p, t);
   }
 

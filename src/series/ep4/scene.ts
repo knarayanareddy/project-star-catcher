@@ -555,11 +555,14 @@ function sceneTop(ctx: CanvasRenderingContext2D, t: number, post: Post) {
 // ===================================================================== film
 export function renderEp4(ctx: CanvasRenderingContext2D, t: number, post: Post) {
   ctx.save();
-  if (t < 30) sceneReturn(ctx, t, post);
-  else if (t < 75) sceneBrood(ctx, t, post);
-  else if (t < 115) sceneLid(ctx, t, post);
-  else if (t < 160) sceneGift(ctx, t, post);
-  else if (t < 195) sceneHome(ctx, t, post);
-  else sceneTop(ctx, t, post);
-  ctx.restore();
+  try {
+    if (t < 30) sceneReturn(ctx, t, post);
+    else if (t < 75) sceneBrood(ctx, t, post);
+    else if (t < 115) sceneLid(ctx, t, post);
+    else if (t < 160) sceneGift(ctx, t, post);
+    else if (t < 195) sceneHome(ctx, t, post);
+    else sceneTop(ctx, t, post);
+  } finally {
+    ctx.restore();
+  }
 }

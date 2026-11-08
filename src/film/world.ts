@@ -404,7 +404,7 @@ function drawSky(ctx: CanvasRenderingContext2D, ws: WorldState) {
       }
       ctx.fillStyle = "#000";
       ctx.beginPath();
-      ctx.ellipse(m.x, m.y, Math.max(1.5, ir * 0.16 * (1 - m.dil * 0.7)), ir * 0.9, 0, 0, TAU);
+      ctx.ellipse(m.x, m.y, Math.max(1.5, Math.abs(ir * 0.16 * (1 - m.dil * 0.7))), Math.max(0.1, Math.abs(ir * 0.9)), 0, 0, TAU);
       ctx.fill();
       ctx.restore();
     }
@@ -696,9 +696,11 @@ function drawLayer(ctx: CanvasRenderingContext2D, ws: WorldState, L: Layer) {
       ctx.strokeStyle = rgba(pal.lit, 0.5 * (1 - clamp(tau / 4)));
       ctx.lineWidth = 2;
       for (let k = 0; k < 3; k++) {
-        const rr = Math.max(0, tau - k * 0.35) * 260 * L.sc;
+        const span = tau - k * 0.35;
+        if (span <= 0) continue;
+        const rr = Math.max(0.1, span * 260 * L.sc);
         ctx.beginPath();
-        ctx.ellipse(hx, L.base, rr, rr * 0.16, 0, 0, TAU);
+        ctx.ellipse(hx, L.base, rr, Math.max(0.1, rr * 0.16), 0, 0, TAU);
         ctx.stroke();
       }
       for (let k = 0; k < 46; k++) {
@@ -740,7 +742,7 @@ function drawLayer(ctx: CanvasRenderingContext2D, ws: WorldState, L: Layer) {
     if (L.sc > 0.55) {
       ctx.fillStyle = rgba(mix3(pal.lamp, [60, 20, 10], 0.5 - st.a * 0.4), 0.95);
       ctx.beginPath();
-      ctx.ellipse(x, y, 4 * l.sz, 5.5 * l.sz, 0, 0, TAU);
+      ctx.ellipse(x, y, Math.max(0.1, 4 * Math.abs(l.sz)), Math.max(0.1, 5.5 * Math.abs(l.sz)), 0, 0, TAU);
       ctx.fill();
       if (lean > 0.01) {
         const tx = ws.lantern.tx - x, ty = ws.lantern.ty - y;
@@ -828,7 +830,13 @@ function drawMechPlane(ctx: CanvasRenderingContext2D, ws: WorldState) {
   const L4 = LAYERS[4];
   ctx.save();
   camera(ctx, ws, 1.0);
-  if (ws.behindMech) ws.behindMech(ctx);
+  if (ws.behindMech) {
+    try {
+      ws.behindMech(ctx);
+    } catch (e) {
+      console.error("behindMech error:", e);
+    }
+  }
   const m = ws.mech;
   if (m) {
     const stand = m.y > BASE4 - 140;
@@ -851,12 +859,12 @@ function drawMechPlane(ctx: CanvasRenderingContext2D, ws: WorldState) {
         ctx.globalCompositeOperation = "lighter";
         for (const fx of [-46, 46]) {
           for (let k = 0; k < 4; k++) {
-            const u = (ws.t * 0.35 + k / 4 + (fx > 0 ? 0.13 : 0)) % 1;
-            const rr = 20 + u * 110 * m.s;
+            const u = (((ws.t * 0.35 + k / 4 + (fx > 0 ? 0.13 : 0)) % 1) + 1) % 1;
+            const rr = Math.max(0.1, 20 + u * 110 * Math.abs(m.s));
             ctx.strokeStyle = rgba(ws.pal.lit, 0.4 * (1 - u) * ws.wake);
             ctx.lineWidth = 1.6;
             ctx.beginPath();
-            ctx.ellipse(m.x + fx * m.s * (m.flip ?? 1), BASE4 + 3, rr, rr * 0.14, 0, 0, TAU);
+            ctx.ellipse(m.x + fx * m.s * (m.flip ?? 1), BASE4 + 3, rr, Math.max(0.1, rr * 0.14), 0, 0, TAU);
             ctx.stroke();
           }
         }
@@ -877,12 +885,18 @@ function drawMechPlane(ctx: CanvasRenderingContext2D, ws: WorldState) {
       ctx.lineWidth = 1.5;
       for (const fx of [-46, 46]) {
         ctx.beginPath();
-        ctx.ellipse(m.x + fx * m.s * (m.flip ?? 1), BASE4 - 4, 34 * m.s, 5, 0, 0, TAU);
+        ctx.ellipse(m.x + fx * m.s * (m.flip ?? 1), BASE4 - 4, Math.max(0.1, 34 * Math.abs(m.s)), 5, 0, 0, TAU);
         ctx.stroke();
       }
     }
   }
-  if (ws.frontMech) ws.frontMech(ctx);
+  if (ws.frontMech) {
+    try {
+      ws.frontMech(ctx);
+    } catch (e) {
+      console.error("frontMech error:", e);
+    }
+  }
   ctx.restore();
   void L4;
 }
@@ -923,6 +937,9 @@ export function horizonY(ws: WorldState) {
 }
 
 export function drawWorld(ctx: CanvasRenderingContext2D, ws: WorldState) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 1;
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, W, H);
   drawSky(ctx, ws);

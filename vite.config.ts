@@ -134,6 +134,8 @@ function mp4ExportPlugin(): Plugin {
           "-r", "30",
           "-i", h264Path,
           "-i", audioPath,
+          "-map", "0:v:0",
+          "-map", "1:a:0",
           "-c:v", "copy",
           "-c:a", "aac",
           "-b:a", "256k",

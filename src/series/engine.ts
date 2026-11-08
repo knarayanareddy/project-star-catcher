@@ -78,7 +78,7 @@ export class SeriesEngine {
     this.scene = document.createElement("canvas");
     this.scene.width = 1280;
     this.scene.height = 720;
-    this.sctx = this.scene.getContext("2d", { alpha: false })!;
+    this.sctx = this.scene.getContext("2d", { alpha: false, colorSpace: "srgb" } as any)!;
     out.width = 1920;
     out.height = 1080;
     this.post = new Post(out, this.scene);
@@ -237,18 +237,21 @@ export class SeriesEngine {
     const vs = (this.out as any).captureStream(30) as MediaStream;
     const stream = new MediaStream([...vs.getVideoTracks(), ...this.recDest!.stream.getAudioTracks()]);
     const types = [
-      "video/mp4;codecs=avc1,mp4a.40.2",
-      "video/mp4;codecs=avc1",
-      "video/mp4",
       "video/webm;codecs=vp9,opus",
       "video/webm;codecs=vp8,opus",
       "video/webm",
+      "video/mp4;codecs=avc1,mp4a.40.2",
+      "video/mp4;codecs=avc1",
+      "video/mp4",
     ];
     const mime = types.find((m) => (window as any).MediaRecorder?.isTypeSupported?.(m)) ?? "";
     this.chunks = [];
     const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 14_000_000, audioBitsPerSecond: 256_000 } : undefined);
     rec.ondataavailable = (e) => e.data.size && this.chunks.push(e.data);
     rec.onstop = () => {
+      try {
+        stream.getTracks().forEach((track) => track.stop());
+      } catch {}
       const ext = (rec.mimeType || mime).includes("mp4") ? "mp4" : "webm";
       onDone(new Blob(this.chunks, { type: rec.mimeType || mime || "video/webm" }), ext);
       this.recorder = null;

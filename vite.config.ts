@@ -27,6 +27,7 @@ function mp4ExportPlugin(): Plugin {
         const episode = url.searchParams.get("episode") || "I";
         const filename = `Star_Catcher_Episode_${episode}.mp4`;
         const tempRaw = path.resolve(os.tmpdir(), `star_catcher_raw_${Date.now()}.bin`);
+        const tempOut = path.resolve(os.tmpdir(), `star_catcher_out_${Date.now()}.mp4`);
         const targetMp4 = path.resolve(os.homedir(), "Downloads", filename);
 
         const fileStream = fs.createWriteStream(tempRaw);
@@ -44,7 +45,7 @@ function mp4ExportPlugin(): Plugin {
             "-c:a", "aac",
             "-b:a", "256k",
             "-movflags", "+faststart",
-            targetMp4
+            tempOut
           ];
 
           const proc = spawn(ffmpeg, args);
@@ -54,9 +55,16 @@ function mp4ExportPlugin(): Plugin {
           proc.on("close", (code) => {
             fs.unlink(tempRaw, () => {});
             if (code === 0) {
+              try {
+                fs.copyFileSync(tempOut, targetMp4);
+                fs.unlinkSync(tempOut);
+              } catch (copyErr) {
+                console.error("Copy error:", copyErr);
+              }
               res.setHeader("Content-Type", "application/json");
               res.end(JSON.stringify({ ok: true, filename, path: targetMp4 }));
             } else {
+              fs.unlink(tempOut, () => {});
               console.error("FFmpeg error:", errLog);
               res.statusCode = 500;
               res.setHeader("Content-Type", "application/json");

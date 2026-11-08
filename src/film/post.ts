@@ -110,7 +110,7 @@ void main(){
   col.b = samp(u-dir*ch*8.0).b;
   vec2 um = mir(u);
   vec3 b = textureLod(uTex,um,3.0).rgb*0.3 + textureLod(uTex,um,4.5).rgb*0.3 + textureLod(uTex,um,6.0).rgb*0.25 + textureLod(uTex,um,7.5).rgb*0.2;
-  col += max(b-0.1,0.0)*uBloom;
+  col += clamp(max(b-0.1,0.0)*uBloom, 0.0, 1.2);
   col *= shade;
   col *= uTint;
   col = (col-0.5)*uContrast+0.5;
@@ -118,7 +118,9 @@ void main(){
   col = mix(vec3(l), col, uSat);
   if(abs(uHue)>0.001) col = hueRot(col, uHue);
   col = mix(col, 1.0-col, uInvert);
-  col = col*uExposure + uFlash;
+  // soft-knee tone compress high luminance before exposure and flash
+  col = col / (vec3(1.0) + max(col - 1.0, vec3(0.0)) * 0.45);
+  col = col*uExposure + min(uFlash, 0.85);
   vec2 vv = (uv-0.5)*vec2(1.0,0.82)*1.45;
   col *= mix(1.0, smoothstep(1.0,0.2,length(vv)), uVig);
   col += (hash2(uv*uRes + fract(uTime)*91.0)-0.5)*uGrain;
@@ -145,7 +147,16 @@ export class Post {
   loc: Record<string, WebGLUniformLocation | null> = {};
 
   constructor(public out: HTMLCanvasElement, public src: HTMLCanvasElement) {
-    this.gl = out.getContext("webgl2", { alpha: false, antialias: false, preserveDrawingBuffer: true });
+    this.gl = out.getContext("webgl2", {
+      alpha: false,
+      premultipliedAlpha: false,
+      antialias: false,
+      preserveDrawingBuffer: true,
+      powerPreference: "high-performance",
+    });
+    if (this.gl && "drawingBufferColorSpace" in this.gl) {
+      try { (this.gl as any).drawingBufferColorSpace = "srgb"; } catch {}
+    }
     if (!this.gl) {
       this.c2d = out.getContext("2d");
       return;
@@ -191,7 +202,9 @@ export class Post {
       c.globalAlpha = 1;
       return;
     }
+    if (this.prog) gl.useProgram(this.prog);
     gl.viewport(0, 0, this.out.width, this.out.height);
+    gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.src);
     gl.generateMipmap(gl.TEXTURE_2D);

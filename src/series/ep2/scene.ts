@@ -168,7 +168,7 @@ function shoreWorld(ctx: CanvasRenderingContext2D, t: number, post: Post) {
   post.exposure = smooth(0, 0.35, t) * (1 - smooth(15.2, 15.5, t));
   post.ripple = 1;
   post.vig = 1.0;
-  post.flash = 1.0 * spike(t, 0.52, 0.2) + 1.0 * spike(t, 15.35, 0.2);
+  post.flash = 0.45 * spike(t, 0.52, 0.15) + 0.55 * spike(t, 15.35, 0.16);
   post.glitch = Math.max(spike(t, 0.52, 0.12), spike(t, 14.9, 0.2), spike(t, 15.3, 0.12)) * 0.9;
   post.chroma = 0.35 + 1.2 * spike(t, 0.52, 0.4) + 0.8 * spike(t, 15.3, 0.4);
   post.zoomBlur = 0.1 * spike(t, 3.0, 0.5) + 0.25 * spike(t, 15.3, 0.3);

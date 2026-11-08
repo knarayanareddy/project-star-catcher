@@ -92,6 +92,125 @@ function mp4ExportPlugin(): Plugin {
           res.end("File not found. Please record the episode first.");
         }
       });
+
+      // POST endpoint to stream video chunks directly to disk
+      server.middlewares.use("/api/save-chunk", (req, res) => {
+        if (req.method !== "POST") {
+          res.statusCode = 405;
+          res.end("Method Not Allowed");
+          return;
+        }
+        const url = new URL(req.url || "/", `http://${req.headers.host}`);
+        const ep = url.searchParams.get("ep") || "ep1";
+        const reset = url.searchParams.get("reset") === "1";
+        const filePath = path.resolve(os.tmpdir(), `render_${ep}.h264`);
+
+        if (reset && fs.existsSync(filePath)) {
+          try { fs.unlinkSync(filePath); } catch {}
+        }
+
+        const outStream = fs.createWriteStream(filePath, { flags: reset ? "w" : "a" });
+        req.pipe(outStream);
+        outStream.on("finish", () => {
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ ok: true }));
+        });
+      });
+
+      // POST endpoint to finalize an episode: mux H.264 stream with Suno Master Audio
+      server.middlewares.use("/api/finalize-episode", (req, res) => {
+        const url = new URL(req.url || "/", `http://${req.headers.host}`);
+        const ep = url.searchParams.get("ep") || "ep1";
+        const roman = url.searchParams.get("roman") || "I";
+        const num = ep.replace("ep", "");
+        const h264Path = path.resolve(os.tmpdir(), `render_${ep}.h264`);
+        const audioPath = path.resolve(__dirname, `public/audio/${ep}/suno_episode${num}_master.mp3`);
+        const targetMp4 = path.resolve(os.homedir(), "Downloads", `Star_Catcher_Episode_${roman}.mp4`);
+        const tempOut = path.resolve(os.tmpdir(), `final_${ep}_${Date.now()}.mp4`);
+        const ffmpeg = "/Users/brightech/.gemini/antigravity/bin/ffmpeg";
+
+        const args = [
+          "-y",
+          "-r", "30",
+          "-i", h264Path,
+          "-i", audioPath,
+          "-c:v", "copy",
+          "-c:a", "aac",
+          "-b:a", "256k",
+          "-shortest",
+          "-movflags", "+faststart",
+          tempOut
+        ];
+
+        const proc = spawn(ffmpeg, args);
+        let errLog = "";
+        proc.stderr.on("data", (d) => { errLog += d.toString(); });
+        proc.on("close", (code) => {
+          if (code === 0) {
+            try {
+              fs.copyFileSync(tempOut, targetMp4);
+              fs.unlinkSync(tempOut);
+              fs.unlinkSync(h264Path);
+            } catch (e) {
+              console.error("Finalize file move error:", e);
+            }
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ ok: true, filename: `Star_Catcher_Episode_${roman}.mp4`, path: targetMp4 }));
+          } else {
+            console.error("FFmpeg finalize error:", errLog);
+            res.statusCode = 500;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ ok: false, error: errLog }));
+          }
+        });
+      });
+
+      // POST endpoint to stitch all 4 episodes together
+      server.middlewares.use("/api/stitch-all", (req, res) => {
+        const downloads = path.resolve(os.homedir(), "Downloads");
+        const listFile = path.resolve(os.tmpdir(), "stitch_list.txt");
+        const outComplete = path.resolve(downloads, "Star_Catcher_The_Complete_Series.mp4");
+        const tempComplete = path.resolve(os.tmpdir(), `complete_${Date.now()}.mp4`);
+        const episodes = ["I", "II", "III", "IV"];
+
+        const listContent = episodes
+          .map((r) => `file '${path.resolve(downloads, `Star_Catcher_Episode_${r}.mp4`)}'`)
+          .join("\n");
+        fs.writeFileSync(listFile, listContent);
+
+        const ffmpeg = "/Users/brightech/.gemini/antigravity/bin/ffmpeg";
+        const args = [
+          "-y",
+          "-f", "concat",
+          "-safe", "0",
+          "-i", listFile,
+          "-c", "copy",
+          "-movflags", "+faststart",
+          tempComplete
+        ];
+
+        const proc = spawn(ffmpeg, args);
+        let errLog = "";
+        proc.stderr.on("data", (d) => { errLog += d.toString(); });
+        proc.on("close", (code) => {
+          fs.unlink(listFile, () => {});
+          if (code === 0) {
+            try {
+              fs.copyFileSync(tempComplete, outComplete);
+              fs.unlinkSync(tempComplete);
+            } catch (e) {
+              console.error("Stitch move error:", e);
+            }
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ ok: true, filename: "Star_Catcher_The_Complete_Series.mp4", path: outComplete }));
+          } else {
+            console.error("Stitch error:", errLog);
+            res.statusCode = 500;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ ok: false, error: errLog }));
+          }
+        });
+      });
     }
   };
 }

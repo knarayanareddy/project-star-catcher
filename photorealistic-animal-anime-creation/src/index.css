@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
+  --color-ink: #07070a;
+  --color-acid: #c6ff3d;
+  --color-hot: #ff4d8d;
+  --color-mint: #7dffc4;
+  --color-gold: #ffd84d;
+}
+
+html { scroll-behavior: smooth; background: #07070a; }
+body { margin: 0; background: #07070a; color: #ecece6; font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+::selection { background: #c6ff3d; color: #07070a; }
+
+@keyframes lower-third {
+  0% { opacity: 0; transform: translateX(-24px); }
+  12%, 82% { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(16px); }
+}
+@keyframes title-in {
+  0% { opacity: 0; transform: scale(1.25); filter: blur(12px); letter-spacing: 0.3em; }
+  18% { opacity: 1; transform: scale(1); filter: blur(0); letter-spacing: 0.02em; }
+  100% { opacity: 1; transform: scale(0.97); }
+}
+@keyframes glitch-x {
+  0%, 92%, 100% { transform: translate(0); }
+  94% { transform: translate(-6px, 2px); }
+  96% { transform: translate(5px, -3px); }
+  98% { transform: translate(-3px, 1px); }
+}
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(198, 255, 61, 0.55); }
+  100% { box-shadow: 0 0 0 22px rgba(198, 255, 61, 0); }
+}
+@keyframes sub-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+.anim-lower-third { animation: lower-third 4.2s ease both; }
+.anim-title { animation: title-in 5.5s cubic-bezier(.2,.8,.2,1) both; }
+.anim-glitch { animation: glitch-x 2.2s steps(1) infinite; }
+.anim-ring { animation: pulse-ring 1.8s ease-out infinite; }
+.anim-sub { animation: sub-in 0.18s ease both; }
+.anim-marquee { animation: marquee 38s linear infinite; }
+
+.scan::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0,0,0,0.0) 0, rgba(0,0,0,0.0) 2px, rgba(0,0,0,0.12) 3px);
+  mix-blend-mode: multiply;
+}
+input[type="range"] { accent-color: #c6ff3d; }
+.scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
